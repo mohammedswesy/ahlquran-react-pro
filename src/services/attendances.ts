@@ -40,6 +40,48 @@ export type ListParams = {
 
 export type Paginated<T> = { data: T[]; meta?: any;[k: string]: any }
 
+export type AttendanceAnalytics = {
+    totals?: {
+        total?: number
+        present?: number
+        absent?: number
+        late?: number
+        excused?: number
+        present_rate?: number
+        [k: string]: any
+    }
+    best_circle?: {
+        circle_id: number
+        circle_name: string
+        total: number
+        present_rate: number
+        [k: string]: any
+    } | null
+    worst_circle?: {
+        circle_id: number
+        circle_name: string
+        total: number
+        present_rate: number
+        [k: string]: any
+    } | null
+    by_circle?: Array<{
+        circle_id: number
+        circle_name: string
+        total: number
+        present: number
+        absent: number
+        present_rate: number
+        [k: string]: any
+    }>
+    top_absences?: Array<{
+        user_id: number
+        user_name: string
+        absences: number
+        [k: string]: any
+    }>
+    [k: string]: any
+}
+
 /* ================= Helpers ================= */
 function normalizeTime(t: any): string | null {
     if (!t) return null
@@ -124,7 +166,7 @@ export async function deleteAttendance(id: number) {
 
 export async function attendanceAnalytics(params?: ListParams) {
     const { data } = await api.get("/attendance/analytics", { params })
-    return data
+    return data as AttendanceAnalytics
 }
 
 
@@ -159,7 +201,7 @@ export async function createAttendance(payload: {
  * 
  *
  */
-export async function submitAttendance(payload: {
+export async function saveAttendance(payload: {
     date: string
     circle_id: number
     records: Array<{ student_id: number; status: AttendanceStatus; notes?: string | null }>
@@ -178,4 +220,49 @@ export async function submitAttendance(payload: {
     }
 
     return { message: "saved" }
+}
+
+export async function submitAttendance(payload: {
+    date: string
+    circle_id: number
+    records: Array<{ student_id: number; status: AttendanceStatus; notes?: string | null }>
+}) {
+    return saveAttendance(payload)
+}
+
+export async function submitBulkAttendance(payload: {
+    date: string
+    circle_id: number
+    records: Array<{ student_id: number; status: AttendanceStatus; notes?: string | null }>
+}) {
+    const { data } = await api.post("/attendance/bulk", coerceNullish(payload))
+    return data
+}
+
+export async function listAttendanceByCircleAndDate(params: {
+    circle_id: number
+    date: string
+}) {
+    const { data } = await api.get("/attendance", {
+        params: {
+            circle_id: params.circle_id,
+            date_from: params.date,
+            date_to: params.date,
+            per_page: 1000,
+        },
+    })
+
+    const src =
+        Array.isArray(data?.data) ? data.data :
+            Array.isArray(data?.data?.data) ? data.data.data :
+                Array.isArray(data) ? data : []
+
+    return src
+        .map((raw: any) => normalizeAttendance(raw))
+        .filter((r: Attendance) => Number(r.student_id) > 0)
+        .map((r: Attendance) => ({
+            student_id: Number(r.student_id),
+            status: (r.status ?? "present") as AttendanceStatus,
+            notes: r.notes ?? null,
+        }))
 }

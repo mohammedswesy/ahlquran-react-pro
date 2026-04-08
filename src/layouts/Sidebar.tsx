@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import { cn } from "@/lib/utils"
-import { PiListBold, PiSignOutBold, PiCaretDownBold } from "react-icons/pi"
+import { PiX, PiListBold, PiSignOutBold, PiCaretDownBold } from "react-icons/pi"
 import { useAuth } from "@/store/auth"
 import { getMenuForRole, type MenuSection, type Role } from "./menus"
 
@@ -20,7 +20,13 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
   const nav = useNavigate()
 
   const role = useAuth((s) => s.role) as Role | null
+  const setRole = useAuth((s) => s.setRole)
   const logout = useAuth((s) => s.logout)
+  const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false)
+
+  const isDev =
+    ((import.meta as any)?.env?.DEV ?? false) ||
+    ((globalThis as any)?.process?.env?.NODE_ENV === "development")
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
@@ -52,15 +58,7 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
   }, [openSections])
 
   const sections = useMemo<MenuSection[]>(() => {
-    const base = getMenuForRole(role)
-    const isSuperAdmin = role === "super-admin"
-
-    const blocked = new Set(["/admin/institutes", "/admin/employees"])
-
-    return base.map((sec) => ({
-      ...sec,
-      items: sec.items.filter((it) => (isSuperAdmin ? true : !blocked.has(it.to))),
-    }))
+    return getMenuForRole(role)
   }, [role])
 
 
@@ -91,23 +89,39 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
     nav("/login", { replace: true })
   }
 
+  function switchRole(nextRole: Role) {
+    setRole(nextRole)
+    setRoleSwitcherOpen(false)
+    if (nextRole === "teacher") nav("/teacher", { replace: true })
+    else if (nextRole === "student") nav("/student", { replace: true })
+    else nav("/admin", { replace: true })
+  }
+
   return (
-    <aside
-      dir="rtl"
-      className={cn("h-screen sticky top-0 border-l overflow-hidden", "bg-[#fefefe]", "text-[var(--text)]")}
-      style={{
-        width: collapsed ? 86 : 290,
-        boxShadow: "var(--shadow2)",
-        borderColor: "var(--border)",
-      }}
-    >
-      <div className="px-4 py-4 flex items-center gap-3 border-b" style={{ borderColor: "var(--border)" }}>
+    <>
+      <aside
+        dir="rtl"
+        className={cn(
+          "h-screen sticky top-0 border-l overflow-hidden transition-all duration-300 flex flex-col",
+          "bg-[rgba(254, 254, 254, 0.98)]",
+          "text-[var(--text)]"
+        )}
+        style={{
+          width: collapsed ? 80 : 290,
+          boxShadow: "2px 0 12px rgba(0, 0, 0, 0.05)",
+          borderColor: "var(--border)",
+        }}
+      >
+      {/* Header */}
+      <div
+        className="px-4 py-4 flex items-center justify-between h-16 shrink-0 border-b"
+        style={{ borderColor: "var(--border)" }}
+      >
         <div
-          className="h-10 w-10 rounded-2xl grid place-items-center font-black"
+          className="h-10 w-10 rounded-lg grid place-items-center font-extrabold text-sm flex-shrink-0"
           style={{
-            background: "rgba(0,61,53,.10)",
-            border: "1px solid rgba(0,61,53,.18)",
-            color: "rgba(0,61,53,.95)",
+            background: `linear-gradient(135deg, var(--brand), var(--brand2))`,
+            color: "white",
           }}
           title={brand.name}
         >
@@ -115,62 +129,69 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
         </div>
 
         {!collapsed && (
-          <div className="flex-1">
-            <div className="font-extrabold leading-5 text-[var(--text)]">{brand.name}</div>
-            <div className="text-xs text-[var(--muted)]">
-              {brand.subtitle || (role ? `Role: ${role}` : "Portal")}
+          <div className="flex-1 min-w-0 px-3">
+            <div className="font-extrabold text-sm leading-tight text-[var(--text)]">
+              {brand.name}
+            </div>
+            <div className="text-xs text-[var(--muted)] truncate">
+              {role === "super-admin"
+                ? "مدير النظام"
+                : brand.subtitle || (role ? role : "Portal")}
             </div>
           </div>
         )}
 
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="h-10 w-10 rounded-2xl border grid place-items-center hover:opacity-90 transition"
+          className="h-10 w-10 rounded-lg flex items-center justify-center hover:bg-[var(--surface2)] transition-colors flex-shrink-0"
           style={{
-            borderColor: "var(--border)",
-            background: "rgba(0,61,53,.04)",
-            color: "rgba(0,61,53,.95)",
+            color: "var(--brand)",
           }}
           title={collapsed ? "توسيع" : "تصغير"}
         >
-          <PiListBold />
+          {collapsed ? <PiListBold size={20} /> : <PiX size={20} />}
         </button>
       </div>
 
-      <div className="px-3 py-3 overflow-y-auto h-[calc(100vh-160px)]">
+      {/* Navigation */}
+      <div className="flex-1 px-3 py-4 overflow-y-auto space-y-3">
         {sections.map((sec, idx) => {
           const key = `sec_${idx}_${sec.title || "main"}`
           const open = openSections[key] ?? true
 
           return (
-            <div className="mb-3" key={key}>
+            <div className="space-y-2" key={key}>
               {(sec.title || !collapsed) && (
                 <button
                   type="button"
                   onClick={() => setOpenSections((p) => ({ ...p, [key]: !open }))}
-                  className={cn("w-full flex items-center justify-between rounded-2xl px-3 py-2 transition", "hover:opacity-95")}
+                  className={cn(
+                    "w-full flex items-center justify-between rounded-lg px-3 py-2 transition-all text-xs font-semibold",
+                    "h-10 shrink-0"
+                  )}
                   style={{
-                    background: "rgba(0,61,53,.03)",
-                    border: "1px solid rgba(0,61,53,.10)",
-                    color: "var(--muted)",
+                    background: "rgba(0, 61, 53, 0.05)",
+                    color: "var(--brand)",
                   }}
                   title={collapsed ? sec.title || "" : ""}
                 >
-                  <span className="text-xs opacity-70">{!collapsed ? (sec.title ?? "") : sec.title ? "•" : ""}</span>
+                  <span className={cn(!collapsed && "truncate")}>
+                    {!collapsed ? (sec.title ?? "") : "•"}
+                  </span>
 
                   {!collapsed && sec.title && (
                     <span
-                      className={cn("transition", open ? "rotate-0" : "-rotate-90")}
-                      style={{ color: "rgba(0,61,53,.75)" }}
+                      className={cn("transition-transform duration-200 flex-shrink-0", open ? "rotate-0" : "-rotate-90")}
+                      style={{ color: "var(--brand)" }}
                     >
-                      <PiCaretDownBold />
+                      <PiCaretDownBold size={16} />
                     </span>
                   )}
                 </button>
               )}
 
               {open && (
-                <div className="mt-2 space-y-1">
+                <div className="space-y-1.5">
                   {sec.items.map((item) => {
                     const Icon = item.icon
                     return (
@@ -178,23 +199,35 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
                         key={item.to}
                         to={item.to}
                         className={({ isActive }) =>
-                          cn("group flex items-center gap-3 rounded-2xl px-3 py-3 transition border", isActive ? "active" : "")
+                          cn(
+                            "group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all h-10 shrink-0",
+                            isActive ? "active" : ""
+                          )
                         }
                         style={({ isActive }) => ({
-                          borderColor: isActive ? "rgba(0,61,53,.22)" : "rgba(0,61,53,.10)",
-                          background: isActive ? "rgba(0,61,53,.08)" : "rgba(254,254,254,.80)",
-                          color: isActive ? "rgba(0,61,53,.95)" : "var(--text)",
+                          background: isActive
+                            ? "linear-gradient(135deg, rgba(0, 61, 53, 0.1), rgba(220, 203, 160, 0.05))"
+                            : "transparent",
+                          color: isActive ? "var(--brand)" : "var(--muted)",
+                          borderLeft: isActive ? "3px solid var(--brand)" : "3px solid transparent",
                         })}
                         title={collapsed ? item.label : ""}
                         end={false}
                       >
-                        {Icon && (
-                          <span className="text-lg opacity-90" style={{ color: "rgba(0,61,53,.85)" }}>
-                            <Icon />
-                          </span>
-                        )}
+                        {/* التعديل الجوهري هنا: إضافة ({ isActive }) => */}
+                        {({ isActive }) => (
+                          <>
+                            {Icon && (
+                              <span className="text-lg flex-shrink-0" style={{ opacity: isActive ? 1 : 0.7 }}>
+                                <Icon />
+                              </span>
+                            )}
 
-                        {!collapsed && <span className="font-semibold">{item.label}</span>}
+                            {!collapsed && (
+                              <span className="font-medium text-sm truncate">{item.label}</span>
+                            )}
+                          </>
+                        )}
                       </NavLink>
                     )
                   })}
@@ -205,24 +238,84 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
         })}
       </div>
 
-      <div className="px-3 py-3 border-t" style={{ borderColor: "var(--border)" }}>
+      {/* Footer - Logout */}
+      <div
+        className="px-3 py-4 border-t shrink-0"
+        style={{ borderColor: "var(--border)" }}
+      >
         <button
           onClick={handleLogout}
-          className={cn("w-full flex items-center gap-3 rounded-2xl px-3 py-3 transition", "border hover:opacity-90")}
+          className={cn(
+            "w-full flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all h-10",
+            "hover:bg-red-50"
+          )}
           style={{
-            borderColor: "var(--border)",
-            background: "rgba(0,61,53,.04)",
-            color: "rgba(0,61,53,.95)",
+            color: "#dc2626",
           }}
           title="خروج"
         >
-          <span className="text-lg">
+          <span className="text-lg flex-shrink-0">
             <PiSignOutBold />
           </span>
-          {!collapsed && <span className="font-semibold">خروج</span>}
+          {!collapsed && <span className="font-medium text-sm">خروج</span>}
         </button>
       </div>
-    </aside>
+      </aside>
+
+      {isDev && (
+        <div className="fixed bottom-4 left-4 z-[60]" dir="rtl">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setRoleSwitcherOpen((v) => !v)}
+              className="h-10 rounded-xl px-3 text-sm font-bold border"
+              style={{
+                background: "#003d35",
+                color: "#fff",
+                borderColor: "rgba(0,61,53,.8)",
+                boxShadow: "0 8px 20px rgba(0,0,0,.18)",
+              }}
+              title="Debug Role Switcher"
+            >
+              تبديل الدور
+            </button>
+
+            {roleSwitcherOpen && (
+              <div
+                className="absolute bottom-12 left-0 w-44 rounded-xl border p-2 space-y-1"
+                style={{
+                  background: "rgba(254,254,254,.98)",
+                  borderColor: "var(--border)",
+                  boxShadow: "0 12px 28px rgba(0,0,0,.14)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => switchRole("super-admin")}
+                  className="w-full rounded-lg px-3 py-2 text-sm text-right hover:bg-[var(--surface2)]"
+                >
+                  Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchRole("teacher")}
+                  className="w-full rounded-lg px-3 py-2 text-sm text-right hover:bg-[var(--surface2)]"
+                >
+                  Teacher
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchRole("student")}
+                  className="w-full rounded-lg px-3 py-2 text-sm text-right hover:bg-[var(--surface2)]"
+                >
+                  Student
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 

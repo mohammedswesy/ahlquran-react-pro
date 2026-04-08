@@ -1,233 +1,430 @@
-import AppLayout from "@/layouts/AppLayout"
+﻿import AppLayout from "@/layouts/AppLayout"
 import Header from "@/components/ui/Header"
-import { Card, CardHeader, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Link } from "react-router-dom"
-import { DataTable } from "@/components/ui/datatable"
-import { useEffect, useMemo, useState } from "react"
-import { toast } from "sonner"
+import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import {
-    fetchTeacherDashboard,
-    type TeacherDashboard,
-    type TeacherAttendancePoint,
+    listMyStats,
+    listMyRecentActivity,
+    type TeacherStats,
+    type ActivityEntry,
 } from "@/services/dashboard"
-import { PiUsersThreeBold, PiBookOpenTextBold, PiSquaresFourBold } from "react-icons/pi"
+import { listMyCircles, type TeacherCircle } from "@/services/circles"
+import {
+    PiUsersThreeBold,
+    PiBookOpenTextBold,
+    PiCalendarCheckBold,
+    PiNotePencilBold,
+    PiClipboardTextBold,
+    PiBuildingsBold,
+    PiArrowLeftBold,
+    PiClockCountdownBold,
+    PiCheckCircleBold,
+    PiWarningCircleBold,
+} from "react-icons/pi"
 
-type TeacherAssessmentPoint = {
-    date: string
-    circle: string
-    kind?: string | null
-    title?: string | null
-    avg_score?: number | null
+// ─── Brand tokens ────────────────────────────────────────────
+const P = "#003d35"
+const SURFACE = "rgba(254,254,254,0.98)"
+
+// ─── Shared Skeleton primitive ───────────────────────────────
+function Pulse({ className = "" }: { className?: string }) {
+    return (
+        <div
+            className={`animate-pulse rounded-lg bg-slate-200 ${className}`}
+        />
+    )
 }
 
-// ✅ ألوان الهوية المعتمدة
-const BRAND = {
-    primary: "#003d35",
-    secondary: "#dccba0",
-    white: "#fefefe",
+// ─── KPI card skeleton ────────────────────────────────────────
+function StatSkeleton() {
+    return (
+        <div
+            className="rounded-2xl border p-5 space-y-3"
+            style={{ background: SURFACE, borderColor: "var(--border)" }}
+        >
+            <Pulse className="h-4 w-24" />
+            <Pulse className="h-9 w-16" />
+            <Pulse className="h-3 w-20" />
+        </div>
+    )
+}
+
+// ─── Circle card skeleton ────────────────────────────────────
+function CircleCardSkeleton() {
+    return (
+        <div
+            className="rounded-2xl border p-5 space-y-3"
+            style={{ background: SURFACE, borderColor: "var(--border)" }}
+        >
+            <Pulse className="h-5 w-32" />
+            <Pulse className="h-3 w-24" />
+            <Pulse className="h-3 w-16" />
+            <Pulse className="h-9 w-full mt-2 rounded-xl" />
+        </div>
+    )
+}
+
+// ─── Activity skeleton ────────────────────────────────────────
+function ActivitySkeleton() {
+    return (
+        <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex gap-3">
+                    <Pulse className="h-8 w-8 rounded-full shrink-0" />
+                    <div className="flex-1 space-y-2">
+                        <Pulse className="h-3 w-3/4" />
+                        <Pulse className="h-3 w-1/2" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+// ─── Activity type config ─────────────────────────────────────
+const ACTIVITY_CFG: Record<
+    ActivityEntry["type"],
+    { icon: React.ElementType; color: string; bg: string }
+> = {
+    attendance: { icon: PiCalendarCheckBold, color: "#059669", bg: "rgba(5,150,105,.1)" },
+    memorization: { icon: PiBookOpenTextBold, color: P, bg: "rgba(0,61,53,.09)" },
+    review: { icon: PiCheckCircleBold, color: "#7c3aed", bg: "rgba(124,58,237,.09)" },
+    assessment: { icon: PiNotePencilBold, color: "#d97706", bg: "rgba(217,119,6,.1)" },
+    general: { icon: PiClockCountdownBold, color: "#64748b", bg: "rgba(100,116,139,.09)" },
+}
+
+// ─── Format relative time (simple Arabic) ────────────────────
+function relativeAr(dateStr: string): string {
+    if (!dateStr) return ""
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    const diffMs = Date.now() - d.getTime()
+    const mins = Math.floor(diffMs / 60000)
+    if (mins < 1) return "الآن"
+    if (mins < 60) return `منذ ${mins} دقيقة`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `منذ ${hrs} ساعة`
+    const days = Math.floor(hrs / 24)
+    return `منذ ${days} يوم`
+}
+
+// ─── Default stats ────────────────────────────────────────────
+const DEFAULT_STATS: TeacherStats = {
+    total_students: 0,
+    active_circles: 0,
+    today_attendance_percent: 0,
+    pending_exams: 0,
 }
 
 export default function TeacherDashboard() {
-    const [stats, setStats] = useState<TeacherDashboard["totals"]>({ circles: 0, students: 0 })
-    const [recentAttendance, setRecentAttendance] = useState<TeacherAttendancePoint[]>([])
-    const [recentAssessments, setRecentAssessments] = useState<TeacherAssessmentPoint[]>([])
-    const [loading, setLoading] = useState(true)
+    const nav = useNavigate()
+
+    const [stats, setStats] = useState<TeacherStats>(DEFAULT_STATS)
+    const [circles, setCircles] = useState<TeacherCircle[]>([])
+    const [activity, setActivity] = useState<ActivityEntry[]>([])
+
+    const [loadingStats, setLoadingStats] = useState(true)
+    const [loadingCircles, setLoadingCircles] = useState(true)
+    const [loadingActivity, setLoadingActivity] = useState(true)
 
     useEffect(() => {
-        ; (async () => {
-            setLoading(true)
-            try {
-                const res = await fetchTeacherDashboard()
-                const totals = (res as any)?.totals ?? { circles: 0, students: 0 }
-                const att = (res as any)?.recentAttendance ?? (res as any)?.attendance_recent ?? []
-                const asses = (res as any)?.recentAssessments ?? (res as any)?.assessments_recent ?? []
+        listMyStats()
+            .then((s) => setStats(s))
+            .finally(() => setLoadingStats(false))
 
-                setStats(totals)
-                setRecentAttendance(Array.isArray(att) ? att : [])
-                setRecentAssessments(
-                    (Array.isArray(asses) ? asses : []).map((a: any) => ({
-                        date: String(a?.date ?? a?.day ?? ""),
-                        circle: String(a?.circle ?? a?.circle_name ?? a?.class ?? ""),
-                        kind: a?.kind ?? a?.type ?? null,
-                        title: a?.title ?? null,
-                        avg_score: a?.avg_score ?? a?.average ?? null,
-                    }))
-                )
-            } catch {
-                toast.info("سيتم ربط إحصاءات لوحة المعلم حال تجهيز الـ API")
-            } finally {
-                setLoading(false)
-            }
-        })()
+        listMyCircles()
+            .then((c) => setCircles(c))
+            .finally(() => setLoadingCircles(false))
+
+        listMyRecentActivity()
+            .then((a) => setActivity(a))
+            .finally(() => setLoadingActivity(false))
     }, [])
 
-    // ✅ ملاحظة: DataTable عندك يطلب ColumnDef غالبًا (مش key/label)
-    // إذا اشتغل معك key/label تمام. إذا رجع نفس خطأ tanstack، خبرني وبعطيك ColumnDef جاهز.
-    const colsAttendance = useMemo(
-        () => [
-            { key: "date", label: "التاريخ" },
-            { key: "circle", label: "الحلقة" },
-            { key: "present", label: "حاضر" },
-            { key: "absent", label: "غائب" },
-            { key: "late", label: "متأخر" },
-            { key: "excused", label: "مُعذَّر" },
-        ],
-        []
-    )
-
-    const colsAssessments = useMemo(
-        () => [
-            { key: "date", label: "التاريخ" },
-            { key: "circle", label: "الحلقة" },
-            { key: "kind", label: "النوع" },
-            { key: "title", label: "العنوان" },
-            { key: "avg_score", label: "متوسط الدرجة" },
-        ],
-        []
-    )
-
-    const softCardStyle: React.CSSProperties = {
-        background: BRAND.white,
-        border: "1px solid rgba(0,61,53,.14)",
-        boxShadow: "0 10px 30px rgba(0,0,0,.06)",
-        borderRadius: 24,
-    }
-
-    const bigLinkBase: React.CSSProperties = {
-        borderRadius: 24,
-        padding: 20,
-        color: BRAND.white,
-        transition: "all .2s ease",
-        boxShadow: "0 14px 34px rgba(0,0,0,.10)",
-    }
+    // ─── KPI config ───────────────────────────────────────────
+    const kpiCards = [
+        {
+            label: "إجمالي الطلاب",
+            value: stats.total_students,
+            icon: <PiUsersThreeBold size={22} />,
+            color: "#003d35",
+            bg: "rgba(0,61,53,.09)",
+        },
+        {
+            label: "الحلقات النشطة",
+            value: stats.active_circles,
+            icon: <PiBookOpenTextBold size={22} />,
+            color: "#059669",
+            bg: "rgba(5,150,105,.09)",
+        },
+        {
+            label: "نسبة حضور اليوم",
+            value: `${stats.today_attendance_percent}%`,
+            icon: <PiCalendarCheckBold size={22} />,
+            color: "#d97706",
+            bg: "rgba(217,119,6,.09)",
+        },
+        {
+            label: "الاختبارات المعلقة",
+            value: stats.pending_exams,
+            icon: <PiNotePencilBold size={22} />,
+            color: "#dc2626",
+            bg: "rgba(220,38,38,.09)",
+        },
+    ]
 
     return (
         <AppLayout>
-            <Header />
+            <Header
+                title="لوحة المعلم"
+                subtitle="مرحباً — تتبّع حلقاتك وطلابك من هنا"
+                right={
+                    <Button
+                        size="sm"
+                        onClick={() =>
+                            nav(
+                                circles.length
+                                    ? `/teacher/attendance?circle_id=${circles[0].id}`
+                                    : "/teacher/attendance",
+                            )
+                        }
+                        style={{ background: P, color: "#fff" }}
+                    >
+                        <PiClipboardTextBold size={16} className="me-1" />
+                        تسجيل حضور سريع
+                    </Button>
+                }
+            />
 
-            <div className="space-y-6" dir="rtl">
-                {/* العنوان + أكشنز */}
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-extrabold" style={{ color: BRAND.primary }}>
-                        لوحة المعلم
-                    </h1>
+            <div dir="rtl" className="p-5 space-y-6">
 
-                    <div className="flex gap-2">
-                        <Link to="/teacher/circles">
-                            <Button variant="outline">حلقاتي</Button>
-                        </Link>
-                        <Link to="/teacher/attendance">
-                            <Button variant="outline">تسجيل الحضور</Button>
-                        </Link>
-                        <Link to="/teacher/memorization">
-                            <Button variant="outline">تسجيل الحفظ</Button>
-                        </Link>
-                        <Link to="/teacher/assessments">
-                            <Button variant="outline">التقييمات</Button>
-                        </Link>
-                    </div>
+                {/* ── KPI Row ───────────────────────────────────────── */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    {loadingStats
+                        ? [1, 2, 3, 4].map((i) => <StatSkeleton key={i} />)
+                        : kpiCards.map((k) => (
+                            <div
+                                key={k.label}
+                                className="rounded-2xl border p-5 flex flex-col gap-2 transition-shadow hover:shadow-lg"
+                                style={{
+                                    background: SURFACE,
+                                    borderColor: "var(--border)",
+                                    boxShadow: "var(--shadow2)",
+                                }}
+                            >
+                                <div
+                                    className="inline-flex items-center justify-center w-10 h-10 rounded-xl"
+                                    style={{ background: k.bg, color: k.color }}
+                                >
+                                    {k.icon}
+                                </div>
+                                <div
+                                    className="text-3xl font-extrabold leading-none mt-1"
+                                    style={{ color: k.color }}
+                                >
+                                    {k.value}
+                                </div>
+                                <div className="text-sm font-medium" style={{ color: "var(--muted)" }}>
+                                    {k.label}
+                                </div>
+                            </div>
+                        ))}
                 </div>
 
-                {/* بطاقات سريعة */}
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[
-                        { title: "حلقاتي", value: stats.circles, Icon: PiBookOpenTextBold },
-                        { title: "طلابـي", value: stats.students, Icon: PiUsersThreeBold },
-                        { title: "لوحاتي", value: "روابط سريعة", Icon: PiSquaresFourBold },
-                    ].map((s, i) => (
-                        <Card key={i} className="overflow-hidden" style={softCardStyle}>
-                            <CardHeader className="flex items-center justify-between">
-                                <div className="text-sm" style={{ color: "rgba(0,61,53,.75)" }}>
-                                    {s.title}
+                {/* ── Main Grid ─────────────────────────────────────── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    {/* ── My Circles grid (2/3) ───────────────────── */}
+                    <div className="lg:col-span-2">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle>حلقاتي</CardTitle>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="gap-1 text-sm"
+                                        style={{ color: P }}
+                                        onClick={() => nav("/teacher/circles")}
+                                    >
+                                        عرض الكل
+                                        <PiArrowLeftBold size={14} />
+                                    </Button>
                                 </div>
-                                <s.Icon style={{ color: BRAND.primary }} size={18} />
                             </CardHeader>
-                            <CardContent>
-                                <div className="text-3xl font-extrabold" style={{ color: BRAND.primary }}>
-                                    {s.value}
-                                </div>
+                            <CardContent className="pt-4">
+                                {loadingCircles ? (
+                                    <div className="grid sm:grid-cols-2 gap-4">
+                                        {[1, 2, 3, 4].map((i) => (
+                                            <CircleCardSkeleton key={i} />
+                                        ))}
+                                    </div>
+                                ) : circles.length === 0 ? (
+                                    <div
+                                        className="flex flex-col items-center justify-center py-12 gap-3 text-center rounded-xl"
+                                        style={{ background: "rgba(0,61,53,.04)" }}
+                                    >
+                                        <PiWarningCircleBold
+                                            size={36}
+                                            style={{ color: P, opacity: 0.4 }}
+                                        />
+                                        <p className="text-sm" style={{ color: "var(--muted)" }}>
+                                            لا توجد حلقات مرتبطة بحسابك
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="grid sm:grid-cols-2 gap-4">
+                                        {circles.map((circle) => (
+                                            <div
+                                                key={circle.id}
+                                                className="rounded-2xl border p-5 flex flex-col gap-3 transition-shadow hover:shadow-md"
+                                                style={{
+                                                    background: SURFACE,
+                                                    borderColor: "var(--border)",
+                                                }}
+                                            >
+                                                {/* Circle name + badge */}
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <h3
+                                                        className="font-extrabold text-base leading-snug"
+                                                        style={{ color: P }}
+                                                    >
+                                                        {circle.name}
+                                                    </h3>
+                                                    <span
+                                                        className="text-xs px-2 py-0.5 rounded-full shrink-0"
+                                                        style={{
+                                                            background: "rgba(0,61,53,.09)",
+                                                            color: P,
+                                                        }}
+                                                    >
+                                                        نشطة
+                                                    </span>
+                                                </div>
+
+                                                {/* Institute */}
+                                                {circle.institute_name && (
+                                                    <div
+                                                        className="flex items-center gap-1.5 text-sm"
+                                                        style={{ color: "var(--muted)" }}
+                                                    >
+                                                        <PiBuildingsBold size={14} />
+                                                        {circle.institute_name}
+                                                    </div>
+                                                )}
+
+                                                {/* Student count */}
+                                                <div
+                                                    className="flex items-center gap-1.5 text-sm font-semibold"
+                                                    style={{ color: "var(--text)" }}
+                                                >
+                                                    <PiUsersThreeBold
+                                                        size={14}
+                                                        style={{ color: P }}
+                                                    />
+                                                    {circle.students_count ?? 0} طالب
+                                                </div>
+
+                                                {/* Quick Attendance CTA */}
+                                                <Button
+                                                    className="w-full mt-1 gap-2 font-bold"
+                                                    size="sm"
+                                                    style={{ background: P, color: "#fff" }}
+                                                    onClick={() =>
+                                                        nav(
+                                                            `/teacher/attendance?circle_id=${circle.id}`,
+                                                        )
+                                                    }
+                                                >
+                                                    <PiClipboardTextBold size={15} />
+                                                    تسجيل الحضور
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
-                    ))}
+                    </div>
+
+                    {/* ── Recent Activity feed (1/3) ───────────────── */}
+                    <div>
+                        <Card className="h-full">
+                            <CardHeader>
+                                <CardTitle>النشاط الأخير</CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-4">
+                                {loadingActivity ? (
+                                    <ActivitySkeleton />
+                                ) : activity.length === 0 ? (
+                                    <div
+                                        className="flex flex-col items-center justify-center py-12 gap-3 text-center rounded-xl"
+                                        style={{ background: "rgba(0,61,53,.04)" }}
+                                    >
+                                        <PiClockCountdownBold
+                                            size={32}
+                                            style={{ color: P, opacity: 0.35 }}
+                                        />
+                                        <p className="text-sm" style={{ color: "var(--muted)" }}>
+                                            لا يوجد نشاط حديث
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <ol
+                                        className="relative border-s-2"
+                                        style={{ borderColor: "var(--border)" }}
+                                    >
+                                        {activity.map((item, idx) => {
+                                            const cfg =
+                                                ACTIVITY_CFG[item.type] ?? ACTIVITY_CFG.general
+                                            const Icon = cfg.icon
+                                            return (
+                                                <li key={item.id ?? idx} className="mb-5 ms-5">
+                                                    <span
+                                                        className="absolute -start-[18px] flex h-9 w-9 items-center justify-center rounded-full"
+                                                        style={{
+                                                            background: cfg.bg,
+                                                            color: cfg.color,
+                                                        }}
+                                                    >
+                                                        <Icon size={16} />
+                                                    </span>
+                                                    <p
+                                                        className="text-sm font-semibold leading-snug"
+                                                        style={{ color: "var(--text)" }}
+                                                    >
+                                                        {item.description || "—"}
+                                                    </p>
+                                                    {(item.student_name || item.circle_name) && (
+                                                        <p
+                                                            className="text-xs mt-0.5"
+                                                            style={{ color: "var(--muted)" }}
+                                                        >
+                                                            {[item.student_name, item.circle_name]
+                                                                .filter(Boolean)
+                                                                .join(" · ")}
+                                                        </p>
+                                                    )}
+                                                    <time
+                                                        className="text-xs mt-1 block"
+                                                        style={{
+                                                            color: "var(--muted)",
+                                                            opacity: 0.7,
+                                                        }}
+                                                    >
+                                                        {relativeAr(item.date)}
+                                                    </time>
+                                                </li>
+                                            )
+                                        })}
+                                    </ol>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
-
-                {/* روابط كبسات كبيرة */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Link to="/teacher/circles" className="block">
-                        <div
-                            style={{
-                                ...bigLinkBase,
-                                background: BRAND.secondary,
-                                color: BRAND.primary,
-                            }}
-                            className="hover:scale-[1.01]"
-                        >
-                            <div className="text-lg font-extrabold">حلقاتي</div>
-                            <div className="text-sm opacity-90">عرض وإدارة الحلقات</div>
-                        </div>
-                    </Link>
-
-                    <Link to="/teacher/attendance" className="block">
-                        <div
-                            style={{
-                                ...bigLinkBase,
-                                background: BRAND.primary,
-                            }}
-                            className="hover:scale-[1.01]"
-                        >
-                            <div className="text-lg font-extrabold">تسجيل الحضور</div>
-                            <div className="text-sm opacity-90">تسجيل الحضور/الغياب اليومي</div>
-                        </div>
-                    </Link>
-
-                    <Link to="/teacher/memorization" className="block">
-                        <div
-                            style={{
-                                ...bigLinkBase,
-                                background: "linear-gradient(135deg, rgba(0,61,53,1), rgba(0,61,53,.85))",
-                            }}
-                            className="hover:scale-[1.01]"
-                        >
-                            <div className="text-lg font-extrabold">تسجيل الحفظ</div>
-                            <div className="text-sm opacity-90">إضافة وحفظ مقاطع الحفظ اليومية</div>
-                        </div>
-                    </Link>
-
-                    <Link to="/teacher/assessments" className="block">
-                        <div
-                            style={{
-                                ...bigLinkBase,
-                                background: BRAND.secondary,
-                                color: BRAND.primary,
-                            }}
-                            className="hover:scale-[1.01]"
-                        >
-                            <div className="text-lg font-extrabold">التقييمات</div>
-                            <div className="text-sm opacity-90">إضافة/تحديث تقييمات الطلاب</div>
-                        </div>
-                    </Link>
-                </div>
-
-                {/* آخر حضور/غياب */}
-                <Card style={softCardStyle}>
-                    <CardHeader className="font-bold" style={{ color: BRAND.primary }}>
-                        آخر حضور/غياب
-                    </CardHeader>
-                    <CardContent>
-                        <DataTable data={recentAttendance} columns={colsAttendance as any} isLoading={loading} />
-                    </CardContent>
-                </Card>
-
-                {/* آخر التقييمات */}
-                <Card style={softCardStyle}>
-                    <CardHeader className="font-bold" style={{ color: BRAND.primary }}>
-                        آخر التقييمات
-                    </CardHeader>
-                    <CardContent>
-                        <DataTable data={recentAssessments} columns={colsAssessments as any} isLoading={loading} />
-                    </CardContent>
-                </Card>
             </div>
         </AppLayout>
     )

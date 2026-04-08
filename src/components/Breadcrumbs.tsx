@@ -5,9 +5,16 @@ const LABELS: Record<string, string> = {
     // جذور
     '/admin': 'لوحة الإدارة',
     '/teacher': 'لوحة المعلّم',
+    '/teacher/dashboard': 'لوحة المعلّم',
     '/student': 'لوحة الطالب',
     '/parent': 'لوحة وليّ الأمر',
     '/employee': 'لوحة الموظّف',
+    '/employee/dashboard': 'لوحة الموظّف',
+    '/institute/dashboard': 'لوحة الشؤون التعليمية',
+    '/dashboard/memorization': 'الحفظ والمراجعة',
+    '/dashboard/attendance': 'الحضور والغياب',
+    '/dashboard/evaluations': 'الاختبارات والتقييمات',
+    '/dashboard/staff-monitoring': 'مواظبة الموظفين',
 
     // Admin
     '/admin/institutes': 'المعاهد',

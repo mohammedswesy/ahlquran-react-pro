@@ -9,6 +9,10 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
 
+import Stat from "@/components/Stat"
+import { StatusBadge } from "@/components/ui/badge"
+import { Users, Target, GraduationCap } from "lucide-react"
+
 import { listCircles, deleteCircle, type Circle } from "@/services/circles"
 
 const DAY_AR: Record<string, string> = {
@@ -117,36 +121,25 @@ export default function CirclesList() {
   const [rows, setRows] = useState<Circle[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [search, setSearch] = useState("")
-  const [page, setPage] = useState(1)
-  const [perPage] = useState(10)
-  const [meta, setMeta] = useState<any>(null)
-
   const load = async () => {
     setLoading(true)
     try {
       const res = await listCircles({
-        page,
-        per_page: perPage,
-        search: search || undefined,
+        per_page: 1000, // Load all for client-side pagination
       })
 
       setRows(res.data)
-      setMeta(res.meta ?? null)
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "تعذر تحميل الحلقات")
       setRows([])
-      setMeta(null)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    const t = setTimeout(() => load(), 300)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, page])
+    load()
+  }, [])
 
   const onDelete = async (id: number) => {
     if (!confirm("متأكد من حذف الحلقة؟")) return
@@ -162,13 +155,13 @@ export default function CirclesList() {
   const columns = useMemo<ColumnDef<Circle>[]>(() => [
     { id: "idx", header: "#", cell: ({ row }) => row.index + 1 },
 
-    { accessorKey: "name", header: "Name" },
+    { accessorKey: "name", header: "اسم الحلقة" },
 
-    { accessorKey: "type", header: "Type", cell: ({ getValue }) => (getValue() as any) || "—" },
+    { accessorKey: "type", header: "النوع", cell: ({ getValue }) => (getValue() as any) || "—" },
 
     {
       id: "institute",
-      header: "Institute",
+      header: "المعهد",
       cell: ({ row }) =>
         row.original.institute?.name ??
         row.original.institute_name ??
@@ -176,54 +169,39 @@ export default function CirclesList() {
         "—",
     },
 
-    // ✅ أيام الدوام
-    {
-      id: "days",
-      header: "الأيام",
-      cell: ({ row }) => {
-        const s = row.original.schedule
-        if (!s?.days || !Array.isArray(s.days) || s.days.length === 0) return "—"
-        return s.days.join(" - ")
-      },
-    },
-
-    // ✅ الوقت
-    {
-      id: "time",
-      header: "الوقت",
-      cell: ({ row }) => {
-        const s = row.original.schedule
-        if (!s?.from || !s?.to) return "—"
-        return `${s.from} - ${s.to}`
-      },
-    },
-
     {
       id: "students",
-      header: "Students",
+      header: "عدد الطلاب",
       cell: ({ row }) => row.original.students_count ?? "—",
     },
 
     {
       id: "teachers",
-      header: "Teachers",
+      header: "المعلمون",
       cell: ({ row }) => row.original.teachers_count ?? "—",
+    },
+
+    // Schedule/Time
+    {
+      id: "schedule",
+      header: "الجدول الزمني",
+      cell: ({ row }) => <ScheduleCell schedule={row.original.schedule} />,
     },
 
     {
       id: "actions",
-      header: "Actions",
+      header: "الإجراءات",
       cell: ({ row }) => (
         <div className="flex gap-2">
           <Link to={`/admin/circles/${row.original.id}`}>
-            <Button size="sm" variant="outline">Edit</Button>
+            <Button size="sm" variant="outline">تعديل</Button>
           </Link>
           <Button
             size="sm"
             variant="destructive"
             onClick={() => onDelete(row.original.id)}
           >
-            Delete
+            حذف
           </Button>
         </div>
       ),
@@ -235,19 +213,30 @@ export default function CirclesList() {
     <AppLayout>
       <Header title="الحلقات" subtitle="إدارة الحلقات" />
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Stat
+          label="إجمالي الحلقات"
+          value={rows.length}
+          icon={<Target className="w-6 h-6" />}
+          color="primary"
+        />
+        <Stat
+          label="متوسط الطلاب لكل حلقة"
+          value={rows.length > 0 ? Math.round(rows.reduce((sum, c) => sum + (c.students_count || 0), 0) / rows.length) : 0}
+          icon={<Users className="w-6 h-6" />}
+          color="success"
+        />
+        <Stat
+          label="المعلمون النشطون"
+          value={rows.reduce((sum, c) => sum + (c.teachers_count || 0), 0)}
+          icon={<GraduationCap className="w-6 h-6" />}
+          color="warning"
+        />
+      </div>
+
       <div dir="rtl" className="space-y-3">
         <div className="flex flex-wrap items-end gap-2">
-          <Input
-            label="بحث"
-            placeholder="ابحث باسم الحلقة…"
-            value={search}
-            onChange={(e) => {
-              setPage(1)
-              setSearch(e.target.value)
-            }}
-            className="w-72"
-          />
-
           <Button variant="outline" onClick={load}>تحديث</Button>
 
           <Link to="/admin/circles/new">
@@ -256,20 +245,6 @@ export default function CirclesList() {
         </div>
 
         <DataTable columns={columns} data={rows} isLoading={loading} searchKey="name" />
-
-        {meta && (
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <div>صفحة {meta.current_page} من {meta.last_page}</div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                السابق
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= meta.last_page} onClick={() => setPage((p) => p + 1)}>
-                التالي
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
 
     </AppLayout>

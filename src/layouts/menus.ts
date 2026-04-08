@@ -31,16 +31,60 @@ export type MenuSection = {
 }
 
 export function getMenuForRole(role: Role | null | undefined): MenuSection[] {
-    // أدوار المشرفين (نفس المنيو)
-    const isAdmin =
-        role === "super-admin" ||
-        role === "org-admin" ||
-        role === "institute-admin" ||
-        role === "sub-admin"
-
     const isSuperAdmin = role === "super-admin"
+    const isInstituteAdmin = role === "institute-admin" || role === "sub-admin"
+    const isOrgAdmin = role === "org-admin"
 
-    if (isAdmin) {
+    if (isSuperAdmin) {
+        return [
+            {
+                items: [{ label: "لوحة القيادة", to: "/admin", icon: LayoutDashboard }],
+            },
+            {
+                title: "الإدارة العامة",
+                items: [
+                    { label: "المعاهد", to: "/admin/institutes", icon: School },
+                    { label: "المنظمات", to: "/admin/organizations", icon: Users },
+                    { label: "الإعدادات العامة", to: "/settings/system", icon: Settings },
+                ],
+            },
+            {
+                title: "التشغيل",
+                items: [
+                    { label: "التقارير", to: "/admin/reports", icon: FileText },
+                    { label: "الإشعارات", to: "/admin/notifications", icon: Bell },
+                    { label: "الموظفون", to: "/admin/employees", icon: UserCog },
+                ],
+            },
+        ]
+    }
+
+    if (isInstituteAdmin) {
+        return [
+            {
+                items: [{ label: "لوحة مدير المعهد", to: "/institute/dashboard", icon: LayoutDashboard }],
+            },
+            {
+                title: "إدارة المعهد",
+                items: [
+                    { label: "المدرسين", to: "/admin/teachers", icon: UserCog },
+                    { label: "الحلقات", to: "/admin/circles", icon: BookOpen },
+                    { label: "الطلاب", to: "/admin/students", icon: Users },
+                    { label: "التقارير", to: "/admin/reports", icon: FileText },
+                ],
+            },
+            {
+                title: "أخرى",
+                items: [
+                    { label: "الإشعارات", to: "/admin/notifications", icon: Bell },
+                    { label: "المكتبة", to: "/admin/library", icon: Library },
+                    { label: "إعدادات المعهد", to: "/settings/institute", icon: Settings },
+                ],
+            },
+        ]
+    }
+
+    if (isOrgAdmin) {
         return [
             {
                 items: [{ label: "لوحة القيادة", to: "/admin", icon: LayoutDashboard }],
@@ -48,38 +92,18 @@ export function getMenuForRole(role: Role | null | undefined): MenuSection[] {
             {
                 title: "الإدارة",
                 items: [
-                    // ✅ سوبر أدمن فقط
-                    ...(isSuperAdmin
-                        ? [{ label: "المعاهد", to: "/admin/institutes", icon: School }]
-                        : []),
-
                     { label: "الحلقات", to: "/admin/circles", icon: BookOpen },
-
-                    // ✅ سوبر أدمن فقط (لأن الراوت عندك محمي سوبر)
-                    ...(isSuperAdmin
-                        ? [{ label: "المعلّمون", to: "/admin/employees", icon: UserCog }]
-                        : []),
-
                     { label: "الطلاب", to: "/admin/students", icon: Users },
-                    { label: "أولياء الأمور", to: "/admin/parents", icon: Users },
-                ],
-            },
-            {
-                title: "تشغيل",
-                items: [
-                    { label: "الحضور والغياب", to: "/admin/attendance", icon: ClipboardList },
+                    { label: "المدرسين", to: "/admin/teachers", icon: UserCog },
                     { label: "التقارير", to: "/admin/reports", icon: FileText },
-                    { label: "الإشعارات", to: "/admin/notifications", icon: Bell },
-                    { label: "إحصاءات", to: "/admin/stats", icon: LineChart },
                 ],
             },
             {
                 title: "أخرى",
                 items: [
+                    { label: "الإشعارات", to: "/admin/notifications", icon: Bell },
                     { label: "المكتبة", to: "/admin/library", icon: Library },
-                    { label: "المقرأة الإلكترونية", to: "/admin/erecite", icon: Laptop },
-                    { label: "إعداد البطاقات", to: "/admin/cards", icon: IdCard },
-                    { label: "الإعدادات", to: "/admin/settings", icon: Settings },
+                    { label: "الملف الشخصي", to: "/settings/profile", icon: Settings },
                 ],
             },
         ]

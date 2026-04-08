@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/datatable"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Modal } from "@/components/ui/modal"
 import type { ColumnDef } from "@tanstack/react-table"
 import { toast } from "sonner"
 import { ChevronsUpDown, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
+import ModalFormShell from "@/components/ui/modal-form-shell"
 
 import {
     listAttendances,
@@ -24,6 +24,7 @@ import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from "
 
 import AttendanceForm, { type AttendanceFormValues } from "./AttendanceForm"
 import AttendanceChart from "./AttendanceChart"
+import LoadingBar from "@/components/ui/loading-bar"
 
 type AttendancePoint = {
     date: string
@@ -92,7 +93,7 @@ export default function AttendancesList() {
     const [openEdit, setOpenEdit] = useState<Attendance | null>(null)
     const [submitting, setSubmitting] = useState(false)
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true)
         try {
             const res = await listAttendances({
@@ -118,13 +119,12 @@ export default function AttendancesList() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [circleId, dateFrom, dateTo, page, perPage, search, status, studentId, instId])
 
     useEffect(() => {
         const id = setTimeout(() => load(), 350)
         return () => clearTimeout(id)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, page, dateFrom, dateTo, status, instId, circleId, studentId])
+    }, [load])
 
     const columns = useMemo<ColumnDef<Attendance>[]>(
         () => [
@@ -207,6 +207,7 @@ export default function AttendancesList() {
 
     return (
         <div className="space-y-4" dir="rtl">
+            <LoadingBar active={loading} />
             {chartData.length > 0 && <AttendanceChart data={chartData as any} />}
 
             <div className="flex flex-wrap items-end gap-2">
@@ -440,9 +441,15 @@ export default function AttendancesList() {
                 </div>
             )}
 
-            <Modal open={!!openEdit} onClose={() => setOpenEdit(null)} title="تعديل حضور" footer={null}>
-                <AttendanceForm submitting={submitting} defaultValues={openEdit ?? undefined} onSubmit={onEdit} />
-            </Modal>
+            <ModalFormShell
+                open={!!openEdit}
+                onClose={() => setOpenEdit(null)}
+                title="تعديل حضور"
+                formId="attendance-edit-form"
+                submitting={submitting}
+            >
+                <AttendanceForm formId="attendance-edit-form" showActions={false} submitting={submitting} defaultValues={openEdit ?? undefined} onSubmit={onEdit} />
+            </ModalFormShell>
         </div>
     )
 }

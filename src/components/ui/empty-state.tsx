@@ -6,6 +6,7 @@ import { Inbox } from "lucide-react"
 type Props = {
     title?: string
     desc?: string
+    description?: string
     className?: string
     actionLabel?: string
     onAction?: () => void
@@ -15,19 +16,23 @@ type Props = {
 export default function EmptyState({
     title = "لا توجد بيانات",
     desc = "ابدأ بإضافة أول سجل.",
+    description,
     className,
     actionLabel,
     onAction,
     icon: Icon = Inbox,
 }: Props) {
+    const text = description ?? desc
     return (
         <div className={cn("rounded-xl border py-12 px-6 text-center grid place-items-center gap-3 bg-white", className)}>
             <Icon className="opacity-70" size={36} />
             <div className="text-lg font-semibold">{title}</div>
-            <div className="text-sm text-gray-600">{desc}</div>
+            <div className="text-sm text-gray-600">{text}</div>
             {actionLabel && onAction && (
                 <Button className="mt-2" onClick={onAction}>{actionLabel}</Button>
             )}
         </div>
     )
 }
+
+export { EmptyState }

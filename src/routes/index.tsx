@@ -1,72 +1,68 @@
+import { lazy, Suspense } from "react"
 import { Routes, Route, Navigate } from "react-router-dom"
 import { ProtectedRoute, RoleGuard } from "./guards"
 
-// Auth
-import Login from "@/pages/auth/Login"
-import Unauthorized from "@/pages/auth/Unauthorized"
+const Login = lazy(() => import("@/pages/auth/Login"))
+const Unauthorized = lazy(() => import("@/pages/auth/Unauthorized"))
 
-// Dashboards
-import AdminDashboard from "@/pages/admin/Dashboard"
-import TeacherDashboard from "@/pages/teacher/Dashboard"
-import StudentDashboard from "@/pages/student/Dashboard"
-import ParentDashboard from "@/pages/parent/Dashboard"
-import EmployeeDashboard from "@/pages/employee/Dashboard"
-import InstituteAdminDashboardPage from "@/pages/institute/InstituteAdminDashboardPage"
+const AdminDashboard = lazy(() => import("@/pages/admin/Dashboard"))
+const TeacherDashboard = lazy(() => import("@/pages/teacher/Dashboard"))
+const StudentDashboard = lazy(() => import("@/pages/student/Dashboard"))
+const ParentDashboard = lazy(() => import("@/pages/parent/Dashboard"))
+const EmployeeDashboard = lazy(() => import("@/pages/employee/Dashboard"))
+const InstituteAdminDashboardPage = lazy(() => import("@/pages/institute/InstituteAdminDashboardPage"))
 
-// Admin: Lists
-import InstitutesList from "@/pages/admin/InstitutesList"
-import EmployeesList from "@/pages/admin/EmployeesList"
-import CirclesList from "@/pages/admin/CirclesList"
-import CircleForm from "@/pages/admin/CircleForm"
-import StudentsList from "@/pages/admin/StudentsList"
-import ParentsList from "@/pages/admin/ParentsList"
-import NotificationsList from "@/pages/admin/NotificationsList"
-import TeachersList from "@/pages/admin/TeachersList"
-import ParentCreate from "@/pages/admin/ParentCreate"
-import ParentShow from "@/pages/admin/ParentShow"
-import ParentEdit from "@/pages/admin/ParentEdit"
-import EmployeeAttendancePage from "@/pages/admin/EmployeeAttendancePage"
-import TeacherAttendancesList from "@/pages/admin/TeacherAttendancesList"
-import AttendancesList from "@/pages/admin/AttendancesList"
-import AdminReports from "@/pages/admin/Reports"
+const InstitutesList = lazy(() => import("@/pages/admin/InstitutesList"))
+const OrganizationsList = lazy(() => import("@/pages/admin/OrganizationsList"))
+const EmployeesList = lazy(() => import("@/pages/admin/EmployeesList"))
+const CirclesList = lazy(() => import("@/pages/admin/CirclesList"))
+const CircleForm = lazy(() => import("@/pages/admin/CircleForm"))
+const StudentsList = lazy(() => import("@/pages/admin/StudentsList"))
+const ParentsList = lazy(() => import("@/pages/admin/ParentsList"))
+const NotificationsList = lazy(() => import("@/pages/admin/NotificationsList"))
+const TeachersList = lazy(() => import("@/pages/admin/TeachersList"))
+const ParentCreate = lazy(() => import("@/pages/admin/ParentCreate"))
+const ParentShow = lazy(() => import("@/pages/admin/ParentShow"))
+const ParentEdit = lazy(() => import("@/pages/admin/ParentEdit"))
+const EmployeeAttendancePage = lazy(() => import("@/pages/admin/EmployeeAttendancePage"))
+const TeacherAttendancesList = lazy(() => import("@/pages/admin/TeacherAttendancesList"))
+const AttendancesList = lazy(() => import("@/pages/admin/AttendancesList"))
+const AdminReports = lazy(() => import("@/pages/admin/Reports"))
+const EnrollmentsList = lazy(() => import("@/pages/admin/EnrollmentsList"))
+const EnrollmentForm = lazy(() => import("@/pages/admin/EnrollmentForm"))
+const BillingsList = lazy(() => import("@/pages/admin/BillingsList"))
 
-// Teacher
-import MyCircles from "@/pages/teacher/MyCircles"
-import TakeAttendance from "@/pages/teacher/TakeAttendance"
-import Assessments from "@/pages/teacher/Assessments"
-import Memorization from "@/pages/teacher/Memorization"
-import Reviews from "@/pages/teacher/Reviews"
+const MyCircles = lazy(() => import("@/pages/teacher/MyCircles"))
+const TakeAttendance = lazy(() => import("@/pages/teacher/TakeAttendance"))
+const Assessments = lazy(() => import("@/pages/teacher/Assessments"))
+const Memorization = lazy(() => import("@/pages/teacher/Memorization"))
+const Reviews = lazy(() => import("@/pages/teacher/Reviews"))
 
-// Student
-import MyProgress from "@/pages/student/MyProgress"
-import MySchedule from "@/pages/student/MySchedule"
+const MyProgress = lazy(() => import("@/pages/student/MyProgress"))
+const MySchedule = lazy(() => import("@/pages/student/MySchedule"))
 
-// Parent
-import Children from "@/pages/parent/Children"
-import ParentReports from "@/pages/parent/Reports"
+const Children = lazy(() => import("@/pages/parent/Children"))
+const ParentReports = lazy(() => import("@/pages/parent/Reports"))
 
-// Employee
-import Tasks from "@/pages/employee/Tasks"
-import People from "@/pages/employee/People"
+const Tasks = lazy(() => import("@/pages/employee/Tasks"))
+const People = lazy(() => import("@/pages/employee/People"))
 
-//  Settings
-import SettingsHome from "@/pages/settings/SettingsHome"
-import ProfileSettings from "@/pages/settings/ProfileSettings"
-import SecuritySettings from "@/pages/settings/SecuritySettings"
-import InstituteSettings from "@/pages/settings/InstituteSettings"
-import SystemSettings from "@/pages/settings/SystemSettings"
+const SettingsHome = lazy(() => import("@/pages/settings/SettingsHome"))
+const ProfileSettings = lazy(() => import("@/pages/settings/ProfileSettings"))
+const SecuritySettings = lazy(() => import("@/pages/settings/SecuritySettings"))
+const InstituteSettings = lazy(() => import("@/pages/settings/InstituteSettings"))
+const SystemSettings = lazy(() => import("@/pages/settings/SystemSettings"))
 
-
-//  Library (NEW)
-import LibraryCategoriesPage from "@/pages/library/admin/LibraryCategoriesPage"
-import LibrarySubCategoriesPage from "@/pages/library/admin/LibrarySubCategoriesPage"
-import LibraryItemsPage from "@/pages/library/admin/LibraryItemsPage"
-import LibraryItemFormPage from "@/pages/library/admin/LibraryItemFormPage"
+const LibraryCategoriesPage = lazy(() => import("@/pages/library/admin/LibraryCategoriesPage"))
+const LibrarySubCategoriesPage = lazy(() => import("@/pages/library/admin/LibrarySubCategoriesPage"))
+const LibraryItemsPage = lazy(() => import("@/pages/library/admin/LibraryItemsPage"))
+const LibraryItemFormPage = lazy(() => import("@/pages/admin/LibraryItemFormPage"))
 
 
 export default function AppRoutes() {
   return (
-    <Routes>
+    <Suspense fallback={<div className="p-4 text-right" dir="rtl">جاري تحميل الصفحة...</div>}>
+      <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
@@ -94,6 +90,10 @@ export default function AppRoutes() {
             ========================= */}
         <Route element={<RoleGuard allow={["super-admin", "org-admin", "institute-admin", "sub-admin"]} />}>
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/dashboard/memorization" element={<Navigate to="/admin/reports" replace />} />
+          <Route path="/dashboard/attendance" element={<Navigate to="/admin/attendance" replace />} />
+          <Route path="/dashboard/evaluations" element={<Navigate to="/admin/reports" replace />} />
+          <Route path="/dashboard/staff-monitoring" element={<Navigate to="/admin/employee-attendance" replace />} />
 
           <Route path="/admin/teacher-attendance" element={<TeacherAttendancesList />} />
           <Route path="/admin/attendance" element={<AttendancesList />} />
@@ -105,6 +105,10 @@ export default function AppRoutes() {
           <Route path="/admin/circles/:id" element={<CircleForm />} />
 
           <Route path="/admin/students" element={<StudentsList />} />
+          <Route path="/admin/enrollments" element={<EnrollmentsList />} />
+          <Route path="/admin/enrollments/new" element={<EnrollmentForm />} />
+          <Route path="/admin/enrollments/:id/edit" element={<EnrollmentForm />} />
+          <Route path="/admin/billings" element={<BillingsList />} />
 
           <Route path="/admin/parents" element={<ParentsList />} />
           <Route path="/admin/parents/create" element={<ParentCreate />} />
@@ -112,6 +116,13 @@ export default function AppRoutes() {
           <Route path="/admin/parents/:id/edit" element={<ParentEdit />} />
 
           <Route path="/admin/teachers" element={<TeachersList />} />
+
+          <Route path="/admin/library" element={<LibraryItemsPage />} />
+          <Route path="/admin/library/categories" element={<LibraryCategoriesPage />} />
+          <Route path="/admin/library/sub-categories" element={<LibrarySubCategoriesPage />} />
+          <Route path="/admin/library/items" element={<LibraryItemsPage />} />
+          <Route path="/admin/library/items/new" element={<LibraryItemFormPage />} />
+          <Route path="/admin/library/items/:id/edit" element={<LibraryItemFormPage />} />
 
           <Route path="/admin/notifications" element={<NotificationsList />} />
         </Route>
@@ -121,6 +132,7 @@ export default function AppRoutes() {
             ========================= */}
         <Route element={<RoleGuard allow={["super-admin"]} />}>
           <Route path="/admin/institutes" element={<InstitutesList />} />
+          <Route path="/admin/organizations" element={<OrganizationsList />} />
           <Route path="/admin/employees" element={<EmployeesList />} />
         </Route>
 
@@ -136,6 +148,7 @@ export default function AppRoutes() {
             ========================= */}
         <Route element={<RoleGuard allow={["teacher"]} />}>
           <Route path="/teacher" element={<TeacherDashboard />} />
+          <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
           <Route path="/teacher/circles" element={<MyCircles />} />
           <Route path="/teacher/attendance" element={<TakeAttendance />} />
           <Route path="/teacher/assessments" element={<Assessments />} />
@@ -166,12 +179,14 @@ export default function AppRoutes() {
             ========================= */}
         <Route element={<RoleGuard allow={["employee"]} />}>
           <Route path="/employee" element={<EmployeeDashboard />} />
+          <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
           <Route path="/employee/tasks" element={<Tasks />} />
           <Route path="/employee/people" element={<People />} />
         </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   )
 }

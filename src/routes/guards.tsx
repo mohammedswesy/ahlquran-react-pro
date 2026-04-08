@@ -21,7 +21,19 @@ export function RoleGuard({ allow }: { allow: Role[] }) {
     }
 
     if (!allow.includes(role)) {
-        return <Navigate to="/unauthorized" replace />
+        const dashboardByRole: Record<Role, string> = {
+            "super-admin": "/admin",
+            "org-admin": "/admin",
+            "institute-admin": "/institute/dashboard",
+            "sub-admin": "/institute/dashboard",
+            teacher: "/teacher/dashboard",
+            student: "/student",
+            parent: "/parent",
+            employee: "/employee/dashboard",
+        }
+
+        const fallback = dashboardByRole[role]
+        return <Navigate to={fallback || "/unauthorized"} replace />
     }
 
     return <Outlet />

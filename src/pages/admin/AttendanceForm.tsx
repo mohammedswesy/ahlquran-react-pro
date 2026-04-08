@@ -4,6 +4,7 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import FormError from "@/components/ui/form-error"
 import { cn } from "@/lib/utils"
 import { ChevronsUpDown, Check } from "lucide-react"
 
@@ -33,9 +34,11 @@ type Props = {
     defaultValues?: Partial<Attendance>
     onSubmit: (values: AttendanceFormValues) => Promise<void> | void
     submitting?: boolean
+    formId?: string
+    showActions?: boolean
 }
 
-export default function AttendanceForm({ defaultValues, onSubmit, submitting }: Props) {
+export default function AttendanceForm({ defaultValues, onSubmit, submitting, formId, showActions = true }: Props) {
     const {
         register,
         handleSubmit,
@@ -111,6 +114,7 @@ export default function AttendanceForm({ defaultValues, onSubmit, submitting }: 
 
     return (
         <form
+            id={formId}
             dir="rtl"
             className="grid sm:grid-cols-2 gap-3"
             onSubmit={handleSubmit(async (v) => {
@@ -126,8 +130,8 @@ export default function AttendanceForm({ defaultValues, onSubmit, submitting }: 
         >
             {/* التاريخ والأوقات */}
             <div>
-                <Input label="التاريخ" type="date" {...register("date")} />
-                {errors.date && <p className="text-xs text-red-600 mt-1">{errors.date.message}</p>}
+                <Input label="التاريخ" type="date" error={errors.date?.message} {...register("date")} />
+                <FormError message={errors.date?.message} />
             </div>
 
             <div>
@@ -151,7 +155,7 @@ export default function AttendanceForm({ defaultValues, onSubmit, submitting }: 
                     <option value="late">متأخر</option>
                     <option value="excused">مُعذّر</option>
                 </select>
-                {errors.status && <p className="text-xs text-red-600 mt-1">{errors.status.message}</p>}
+                <FormError message={errors.status?.message} />
             </div>
 
             {/* المعهد */}
@@ -186,7 +190,7 @@ export default function AttendanceForm({ defaultValues, onSubmit, submitting }: 
                         </Command>
                     </PopoverContent>
                 </Popover>
-                {errors.institute_id && <p className="text-xs text-red-600 mt-1">{errors.institute_id.message}</p>}
+                <FormError message={errors.institute_id?.message} />
             </div>
 
             {/* الحلقة */}
@@ -222,7 +226,7 @@ export default function AttendanceForm({ defaultValues, onSubmit, submitting }: 
                         </Command>
                     </PopoverContent>
                 </Popover>
-                {errors.circle_id && <p className="text-xs text-red-600 mt-1">{errors.circle_id.message}</p>}
+                <FormError message={errors.circle_id?.message} />
             </div>
 
             {/* الطالب */}
@@ -258,21 +262,23 @@ export default function AttendanceForm({ defaultValues, onSubmit, submitting }: 
                     </PopoverContent>
                 </Popover>
 
-                {errors.student_id && <p className="text-xs text-red-600 mt-1">{errors.student_id.message}</p>}
+                <FormError message={errors.student_id?.message} />
             </div>
 
             <div className="sm:col-span-2">
                 <Input label="ملاحظات" {...register("notes")} />
             </div>
 
-            <div className="sm:col-span-2 mt-2 flex gap-2">
-                <Button disabled={!!submitting} type="submit">
-                    حفظ
-                </Button>
-                <Button type="button" variant="outline" onClick={() => reset()}>
-                    إعادة ضبط
-                </Button>
-            </div>
+            {showActions && (
+                <div className="sm:col-span-2 mt-2 flex gap-2">
+                    <Button disabled={!!submitting} type="submit">
+                        حفظ
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => reset()}>
+                        إعادة ضبط
+                    </Button>
+                </div>
+            )}
         </form>
     )
 }

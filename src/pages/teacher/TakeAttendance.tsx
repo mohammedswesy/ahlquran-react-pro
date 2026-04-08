@@ -1,22 +1,23 @@
 import { useEffect, useMemo, useState } from "react"
-import { useSearchParams } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 import AppLayout from "@/layouts/AppLayout"
 import Header from "@/components/ui/Header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { DataTable } from "@/components/ui/datatable"
-import type { ColumnDef } from "@tanstack/react-table"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import LoadingBar from "@/components/ui/loading-bar"
 
-import { listMyCircles, type TeacherCircle } from "@/services/circles"
-import { listStudentsByCircleForAttendance, type MiniStudent } from "@/services/students"
-import { submitAttendance, type AttendanceStatus } from "@/services/attendances"
+import { listMyCircles, getMyCircle, listCircleStudents, type TeacherCircle } from "@/services/circles"
+import { listAttendanceByCircleAndDate, submitBulkAttendance, type AttendanceStatus } from "@/services/attendances"
+import { Check, Clock3, Loader2, Users, X } from "lucide-react"
+import { PiCheckBold } from "react-icons/pi"
 
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
-import { ChevronsUpDown, Check } from "lucide-react"
+const SURFACE = "rgba(254, 254, 254, 0.98)"
 
 type Row = {
     id: number
@@ -25,15 +26,33 @@ type Row = {
     notes?: string | null
 }
 
+function StudentRowSkeleton() {
+    return (
+        <div className="rounded-xl border p-3 sm:p-4" style={{ background: SURFACE, borderColor: "var(--border)" }}>
+            <div className="flex items-center gap-3 mb-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-24" />
+                </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+            </div>
+        </div>
+    )
+}
+
 export default function TakeAttendance() {
+    const navigate = useNavigate()
     const [params, setParams] = useSearchParams()
     const initialCircle = Number(params.get("circle_id") || 0)
 
-    // Lookups
     const [circles, setCircles] = useState<TeacherCircle[]>([])
-    const [openCircle, setOpenCircle] = useState(false)
+    const [selectedCircle, setSelectedCircle] = useState<TeacherCircle | null>(null)
 
-    // Form state
     const [circleId, setCircleId] = useState<number | undefined>(initialCircle || undefined)
     const [date, setDate] = useState<string>(() => {
         const d = new Date()
@@ -41,137 +60,90 @@ export default function TakeAttendance() {
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     })
 
-    // Table state
     const [rows, setRows] = useState<Row[]>([])
     const [loading, setLoading] = useState(false)
+    const [loadingCircles, setLoadingCircles] = useState(false)
     const [saving, setSaving] = useState(false)
 
-    // load my circles
     useEffect(() => {
-        ; (async () => {
+        (async () => {
+            setLoadingCircles(true)
             try {
                 const list = await listMyCircles()
                 setCircles(list)
-                // لو ما في circleId بالـ URL اختار أول حلقة تلقائياً
-                if (!circleId && list.length) setCircleId(list[0].id)
             } catch (e: any) {
                 toast.error(e?.response?.data?.message || "تعذر تحميل حلقات المعلّم")
+            } finally {
+                setLoadingCircles(false)
             }
         })()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // load students when circle changes
     useEffect(() => {
-        ; (async () => {
+        (async () => {
             if (!circleId) {
                 setRows([])
+                setSelectedCircle(null)
                 return
             }
             setLoading(true)
             try {
-                const studs: MiniStudent[] = await listStudentsByCircleForAttendance(circleId)
+                const [circle, students, attendanceRows] = await Promise.all([
+                    getMyCircle(circleId),
+                    listCircleStudents(circleId),
+                    listAttendanceByCircleAndDate({ circle_id: circleId, date }),
+                ])
 
-                setRows(studs.map((s) => ({ id: s.id, name: s.name, status: "present", notes: null })))
+                const statusMap = new Map<number, { status: AttendanceStatus; notes?: string | null }>()
+                for (const rec of attendanceRows) {
+                    statusMap.set(Number(rec.student_id), {
+                        status: (rec.status ?? "present") as AttendanceStatus,
+                        notes: rec.notes ?? null,
+                    })
+                }
 
-                // sync url
+                setSelectedCircle(circle)
+                setRows(
+                    students.map((s) => {
+                        const existing = statusMap.get(Number(s.id))
+                        return {
+                            id: Number(s.id),
+                            name: s.name,
+                            status: existing?.status ?? "present",
+                            notes: existing?.notes ?? null,
+                        }
+                    }),
+                )
+
                 const p = new URLSearchParams(params)
                 p.set("circle_id", String(circleId))
                 setParams(p, { replace: true })
             } catch (e: any) {
-                toast.error(e?.response?.data?.message || "تعذر تحميل طلاب الحلقة")
+                toast.error(e?.response?.data?.message || "تعذر تحميل بيانات الحلقة")
                 setRows([])
+                setSelectedCircle(null)
             } finally {
                 setLoading(false)
             }
         })()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [circleId])
+    }, [circleId, date, params, setParams])
 
-    const labelOf = (s: AttendanceStatus) => {
-        switch (s) {
-            case "present":
-                return "حاضر"
-            case "absent":
-                return "غائب"
-            case "late":
-                return "متأخر"
-            case "excused":
-                return "مُعذّر"
-            default:
-                return String(s)
-        }
+    const setStatus = (studentId: number, status: AttendanceStatus) => {
+        setRows((prev) => prev.map((r) => (r.id === studentId ? { ...r, status } : r)))
     }
 
-    // ✅ مهم: لازم كل ColumnDef يكون عنده id لو header مش string
-    const columns = useMemo<ColumnDef<Row>[]>(() => [
-        {
-            id: "idx",
-            header: "#",
-            cell: ({ row }) => row.index + 1,
-        },
-        {
-            accessorKey: "name",
-            header: "اسم الطالب",
-        },
-        {
-            id: "status",
-            header: "الحالة",
-            cell: ({ row }) => {
-                const s = row.original.status
-                return (
-                    <div className="flex flex-wrap gap-2">
-                        {(["present", "absent", "late", "excused"] as AttendanceStatus[]).map((v) => (
-                            <Button
-                                key={v}
-                                size="sm"
-                                variant={s === v ? "primary" : "outline"}
-                                onClick={() => {
-                                    setRows((prev) => prev.map((r) => (r.id === row.original.id ? { ...r, status: v } : r)))
-                                }}
-                            >
-                                {labelOf(v)}
-                            </Button>
-                        ))}
-                    </div>
-                )
-            },
-        },
-        {
-            id: "notes",
-            header: "ملاحظات",
-            cell: ({ row }) => (
-                <Input
-                    placeholder="ملاحظة"
-                    value={row.original.notes ?? ""}
-                    onChange={(e) => {
-                        const v = e.target.value || null
-                        setRows((prev) => prev.map((r) => (r.id === row.original.id ? { ...r, notes: v } : r)))
-                    }}
-                    className="h-8"
-                />
-            ),
-        },
-    ], [])
+    const setAllPresent = () => {
+        setRows((prev) => prev.map((r) => ({ ...r, status: "present" })))
+    }
 
     async function onSubmit() {
-        if (!circleId) {
-            toast.warning("اختر الحلقة أولًا")
+        if (!circleId || !date || !rows.length) {
+            toast.warning("تأكد من اختيار الحلقة والتاريخ ووجود طلاب")
             return
         }
-        if (!date) {
-            toast.warning("اختر التاريخ")
-            return
-        }
-        if (!rows.length) {
-            toast.warning("لا يوجد طلاب")
-            return
-        }
-
         setSaving(true)
         try {
-            // ✅ هذا يطابق باكك: POST /api/attendance
-            await submitAttendance({
+            await submitBulkAttendance({
                 date,
                 circle_id: circleId,
                 records: rows.map((r) => ({
@@ -180,8 +152,7 @@ export default function TakeAttendance() {
                     notes: r.notes ?? null,
                 })),
             })
-
-            toast.success("تم حفظ الحضور ✅")
+            toast.success("تم حفظ التحضير بنجاح")
         } catch (e: any) {
             toast.error(e?.response?.data?.message || "فشل حفظ الحضور")
         } finally {
@@ -189,69 +160,180 @@ export default function TakeAttendance() {
         }
     }
 
-    const circleName = (id?: number) => circles.find((c) => c.id === id)?.name || "اختر الحلقة…"
+    const stats = useMemo(() => {
+        const total = rows.length
+        const present = rows.filter((r) => r.status === "present").length
+        const absent = rows.filter((r) => r.status === "absent").length
+        const late = rows.filter((r) => r.status === "late").length
+        const attendanceRate = total > 0 ? Math.round((present / total) * 100) : 0
+        return { total, present, absent, late, attendanceRate }
+    }, [rows])
 
-    const setAll = (st: AttendanceStatus) => setRows((prev) => prev.map((r) => ({ ...r, status: st })))
+    const statusButtons: Array<{
+        key: AttendanceStatus
+        label: string
+        icon: typeof Check
+        activeClass: string
+    }> = [
+            { key: "present", label: "حاضر", icon: Check, activeClass: "bg-emerald-600 border-emerald-600 text-white" },
+            { key: "absent", label: "غائب", icon: X, activeClass: "bg-red-600 border-red-600 text-white" },
+            { key: "late", label: "متأخر", icon: Clock3, activeClass: "bg-amber-500 border-amber-500 text-white" },
+        ]
 
     return (
         <AppLayout>
-            <Header />
-            <div className="p-4 space-y-4" dir="rtl">
-                <div className="flex flex-wrap items-end gap-3">
-                    {/* الحلقة */}
-                    <div className="min-w-[260px]">
-                        <label className="block text-sm text-gray-700 mb-1">الحلقة</label>
-                        <Popover open={openCircle} onOpenChange={setOpenCircle}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full justify-between">
-                                    {circleName(circleId)}
-                                    <ChevronsUpDown className="opacity-50 size-4" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0" align="end">
-                                <Command>
-                                    <CommandInput placeholder="ابحث عن حلقة…" className="text-right" />
-                                    <CommandEmpty>لا توجد نتائج.</CommandEmpty>
-                                    <CommandGroup>
-                                        {circles.map((c) => (
-                                            <CommandItem
-                                                key={c.id}
-                                                value={c.name}
-                                                onSelect={() => {
-                                                    setCircleId(c.id)
-                                                    setOpenCircle(false)
-                                                }}
-                                            >
-                                                <Check className={cn("ml-2 size-4", c.id === circleId ? "opacity-100" : "opacity-0")} />
-                                                {c.name}
-                                            </CommandItem>
-                                        ))}
-                                    </CommandGroup>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
+            <Header title="الحضور اليومي" subtitle="إدارة تحضير الحلقة بسرعة وبشكل احترافي" />
+            <div className="p-4 sm:p-5 pb-28 space-y-5" dir="rtl">
+                <LoadingBar active={loading || saving || loadingCircles} />
 
-                    {/* التاريخ */}
-                    <div>
-                        <label className="block text-sm text-gray-700 mb-1">التاريخ</label>
-                        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                    </div>
-
-                    {/* أزرار سريعة */}
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setAll("present")}>الكل حاضر</Button>
-                        <Button variant="outline" onClick={() => setAll("absent")}>الكل غائب</Button>
-                    </div>
-
-                    <div className="ml-auto">
-                        <Button onClick={onSubmit} disabled={saving || !circleId}>
-                            {saving ? "يتم الحفظ…" : "حفظ الحضور"}
-                        </Button>
-                    </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                        { label: "الطلاب", value: stats.total },
+                        { label: "حاضر", value: stats.present },
+                        { label: "غائب", value: stats.absent },
+                        { label: "متأخر", value: stats.late },
+                    ].map((item) => (
+                        <div
+                            key={item.label}
+                            className="rounded-xl border p-3"
+                            style={{ background: SURFACE, borderColor: "var(--border)" }}
+                        >
+                            <div className="text-xs" style={{ color: "var(--muted)" }}>{item.label}</div>
+                            <div className="text-2xl font-extrabold" style={{ color: "#065f46" }}>{item.value}</div>
+                        </div>
+                    ))}
                 </div>
 
-                <DataTable data={rows} columns={columns} isLoading={loading} searchKey="name" />
+                <Card>
+                    <CardHeader>
+                        <CardTitle>الحلقة والتاريخ</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                            <div className="md:col-span-2">
+                                <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>
+                                    اختر الحلقة
+                                </label>
+                                <Select
+                                    value={circleId ? String(circleId) : undefined}
+                                    onValueChange={(v) => setCircleId(v ? Number(v) : undefined)}
+                                >
+                                    <SelectTrigger className="h-11">
+                                        <SelectValue placeholder="اختر الحلقة..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {circles.map((circle) => (
+                                            <SelectItem key={circle.id} value={String(circle.id)}>
+                                                {circle.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>
+                                    التاريخ
+                                </label>
+                                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-11" />
+                            </div>
+                        </div>
+
+                        {!!selectedCircle && (
+                            <div className="rounded-xl border px-3 py-2 text-sm" style={{ borderColor: "var(--border)", background: "rgba(16,185,129,.06)" }}>
+                                <span className="font-semibold text-emerald-700">الحلقة المختارة:</span> {selectedCircle.name}
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button variant="outline" className="w-full sm:w-auto" onClick={setAllPresent} disabled={!rows.length || loading}>
+                                <PiCheckBold size={16} className="ms-1" />
+                                تحديد الكل حاضر
+                            </Button>
+                            <Button
+                                className="w-full sm:w-auto bg-emerald-700 hover:bg-emerald-800"
+                                onClick={onSubmit}
+                                disabled={saving || !circleId || !rows.length}
+                            >
+                                {saving ? <Loader2 className="ms-2 h-4 w-4 animate-spin" /> : null}
+                                حفظ التحضير
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {loading || loadingCircles ? (
+                        <>
+                            {[1, 2, 3, 4, 5, 6].map((n) => <StudentRowSkeleton key={n} />)}
+                        </>
+                    ) : !circleId ? (
+                        <Card>
+                            <CardContent className="py-10 text-center text-sm" style={{ color: "var(--muted)" }}>
+                                اختر الحلقة أولاً لعرض الطلاب
+                            </CardContent>
+                        </Card>
+                    ) : rows.length === 0 ? (
+                        <Card>
+                            <CardContent className="py-10 text-center text-sm" style={{ color: "var(--muted)" }}>
+                                لا يوجد طلاب في هذه الحلقة
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        rows.map((student) => (
+                            <Card key={student.id} className="rounded-2xl border" style={{ background: SURFACE, borderColor: "var(--border)" }}>
+                                <CardContent className="p-3 sm:p-4">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ background: "#065f46" }}>
+                                        {student.name.slice(0, 1)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-semibold truncate" style={{ color: "var(--text)" }}>{student.name}</div>
+                                        <div className="text-xs" style={{ color: "var(--muted)" }}>#{student.id}</div>
+                                    </div>
+                                    <Users style={{ color: "var(--muted)" }} size={16} />
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2">
+                                    {statusButtons.map((option) => {
+                                        const Icon = option.icon
+                                        const active = student.status === option.key
+
+                                        return (
+                                            <button
+                                                key={option.key}
+                                                type="button"
+                                                onClick={() => setStatus(student.id, option.key)}
+                                                className={cn(
+                                                    "h-10 rounded-lg border text-sm font-bold transition flex items-center justify-center gap-1",
+                                                    active
+                                                        ? option.activeClass
+                                                        : "bg-white border-[var(--border)] text-[var(--text)]",
+                                                )}
+                                            >
+                                                <Icon className="h-4 w-4" />
+                                                {option.label}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                                </CardContent>
+                            </Card>
+                        ))
+                    )}
+                </div>
+
+                <div className="fixed bottom-0 right-0 left-0 p-3 border-t backdrop-blur md:static md:p-0 md:border-0 md:bg-transparent" style={{ background: "rgba(254,254,254,0.95)", borderColor: "var(--border)" }}>
+                    <div className="max-w-3xl ms-auto">
+                        <Button className="w-full h-12 text-base font-bold md:w-auto md:px-8 bg-emerald-700 hover:bg-emerald-800" onClick={onSubmit} disabled={saving || !circleId || !rows.length}>
+                            {saving ? <Loader2 className="ms-2 h-4 w-4 animate-spin" /> : null}
+                            {saving ? "جاري الحفظ..." : "حفظ التحضير"}
+                        </Button>
+                        <div className="text-xs mt-1 md:hidden" style={{ color: "var(--muted)" }}>
+                            نسبة الحضور: {stats.attendanceRate}%
+                        </div>
+                    </div>
+                </div>
             </div>
         </AppLayout>
     )

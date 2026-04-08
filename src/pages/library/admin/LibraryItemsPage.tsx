@@ -9,7 +9,6 @@ import EmptyState from "@/components/ui/empty-state"
 import SkeletonTable from "@/components/ui/skeleton-table"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
-import { Label } from "@/components/ui/label"
 
 import {
     Select,
@@ -467,7 +466,7 @@ export default function LibraryItemsPage() {
             >
                 <div className="grid gap-3">
                     <div className="grid gap-2">
-                        <Label>Category</Label>
+                        <label className="text-sm font-medium">Category</label>
                         <Select
                             value={form.category_id || ""}
                             onValueChange={(v) => {
@@ -484,7 +483,7 @@ export default function LibraryItemsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>SubCategory (اختياري)</Label>
+                        <label className="text-sm font-medium">SubCategory (اختياري)</label>
                         <Select
                             value={form.sub_category_id}
                             onValueChange={(v) => setForm((f) => ({ ...f, sub_category_id: v }))}
@@ -502,7 +501,7 @@ export default function LibraryItemsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>Title</Label>
+                        <label className="text-sm font-medium">Title</label>
                         <Input
                             value={form.title}
                             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -511,7 +510,7 @@ export default function LibraryItemsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>Description (اختياري)</Label>
+                        <label className="text-sm font-medium">Description (اختياري)</label>
                         <Input
                             value={form.description}
                             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -520,7 +519,7 @@ export default function LibraryItemsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>Type</Label>
+                        <label className="text-sm font-medium">Type</label>
                         <Select
                             value={form.type}
                             onValueChange={(v) => setForm((f) => ({ ...f, type: v as any }))}
@@ -536,7 +535,7 @@ export default function LibraryItemsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>External URL (اختياري)</Label>
+                        <label className="text-sm font-medium">External URL (اختياري)</label>
                         <Input
                             value={form.external_url}
                             onChange={(e) => setForm((f) => ({ ...f, external_url: e.target.value }))}
@@ -545,7 +544,7 @@ export default function LibraryItemsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>File Upload (اختياري)</Label>
+                        <label className="text-sm font-medium">File Upload (اختياري)</label>
                         <Input
                             type="file"
                             onChange={(e) => {

@@ -4,6 +4,7 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import FormError from "@/components/ui/form-error"
 
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
@@ -45,9 +46,12 @@ type Props = {
   defaultValues?: Partial<Employee>
   onSubmit: (values: EmployeeFormValues) => Promise<void> | void
   submitting?: boolean
+  formId?: string
+  showActions?: boolean
+  serverErrors?: Partial<Record<keyof EmployeeFormValues, string>>
 }
 
-export default function EmployeeForm({ defaultValues, onSubmit, submitting }: Props) {
+export default function EmployeeForm({ defaultValues, onSubmit, submitting, formId, showActions = true, serverErrors = {} }: Props) {
   const {
     register,
     handleSubmit,
@@ -91,6 +95,7 @@ export default function EmployeeForm({ defaultValues, onSubmit, submitting }: Pr
 
   return (
     <form
+      id={formId}
       onSubmit={handleSubmit(async (v) => {
         // ✅ لو password فاضية، نحذفها من payload (مفيد جدًا في edit)
         const payload: any = { ...v }
@@ -103,8 +108,8 @@ export default function EmployeeForm({ defaultValues, onSubmit, submitting }: Pr
     >
       {/* الاسم */}
       <div className="sm:col-span-2">
-        <Input label="اسم الموظف" {...register("name")} />
-        {errors.name && <div className="text-red-600 text-xs mt-1">{errors.name.message}</div>}
+        <Input label="اسم الموظف" error={errors.name?.message} {...register("name")} />
+        <FormError message={errors.name?.message} />
       </div>
 
       {/* المسمى الوظيفي */}
@@ -112,29 +117,31 @@ export default function EmployeeForm({ defaultValues, onSubmit, submitting }: Pr
         <Input
           label="المسمى الوظيفي"
           placeholder="مثال: مشرف / إداري / معلّم"
+          error={errors.job_title?.message}
           {...register("job_title")}
         />
-        {errors.job_title && <div className="text-red-600 text-xs mt-1">{errors.job_title.message}</div>}
+        <FormError message={errors.job_title?.message} />
       </div>
 
       {/* البريد + الهاتف */}
       <div>
-        <Input label="البريد" type="email" {...register("email")} />
-        {errors.email && <div className="text-red-600 text-xs mt-1">{errors.email.message}</div>}
+        <Input label="البريد" type="email" error={errors.email?.message || serverErrors.email} {...register("email")} />
+        <FormError message={errors.email?.message || serverErrors.email} />
       </div>
 
       <div>
-        <Input label="الهاتف" {...register("phone")} />
+        <Input label="الهاتف" error={errors.phone?.message} {...register("phone")} />
       </div>
 
       {/* كلمة المرور */}
       <div className="sm:col-span-2">
         <Input
-          label="كلمة المرور للمستخدم (اتركها فارغة إذا لا تريد تغييرها)"
+          label="كلمة المرور للمستخدم (8 أحرف حد أدنى, اتركها فارغة عند التعديل)"
           type="password"
+          error={errors.password?.message || serverErrors.password}
           {...register("password")}
         />
-        {errors.password && <div className="text-red-600 text-xs mt-1">{errors.password.message}</div>}
+        <FormError message={errors.password?.message || serverErrors.password} />
       </div>
 
       {/* الدور */}
@@ -189,7 +196,7 @@ export default function EmployeeForm({ defaultValues, onSubmit, submitting }: Pr
           </PopoverContent>
         </Popover>
 
-        {errors.institute_id && <div className="text-red-600 text-xs mt-1">{errors.institute_id.message}</div>}
+        <FormError message={errors.institute_id?.message} />
       </div>
 
       {/* الحالة */}
@@ -202,14 +209,16 @@ export default function EmployeeForm({ defaultValues, onSubmit, submitting }: Pr
       </div>
 
       {/* أزرار */}
-      <div className="sm:col-span-2 mt-2 flex gap-2">
-        <Button disabled={!!submitting} type="submit">
-          حفظ
-        </Button>
-        <Button type="button" variant="outline" onClick={() => reset()}>
-          إعادة ضبط
-        </Button>
-      </div>
+      {showActions && (
+        <div className="sm:col-span-2 mt-2 flex gap-2">
+          <Button disabled={!!submitting} type="submit">
+            حفظ
+          </Button>
+          <Button type="button" variant="outline" onClick={() => reset()}>
+            إعادة ضبط
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

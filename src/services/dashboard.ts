@@ -1,15 +1,21 @@
 import api from "./api"
 import type { Institute } from "./institutes"
+import type { Role } from "@/store/auth"
 
 /* ======================================================
  * Admin Dashboard
  * ====================================================== */
 
 export type DashboardStats = {
+    institutes?: number
+    revenue?: number
+    institutes_count?: number
+    total_revenue?: number
     parents: number
     circles: number
     teachers: number
     students: number
+    students_count?: number
 }
 
 export type DashboardResponse = {
@@ -25,19 +31,39 @@ export type AttendancePoint = {
     excused: number
 }
 
-export async function fetchDashboard(): Promise<DashboardResponse> {
-    const { data } = await api.get("/admin/dashboard")
+export async function fetchDashboard(role?: Role | null): Promise<DashboardResponse> {
+    const currentRole =
+        role ??
+        ((typeof window !== "undefined" ? localStorage.getItem("role") : null) as Role | null)
+
+    const isInstituteAdmin =
+        currentRole === "institute-admin" || currentRole === "sub-admin"
+
+    const endpoint = isInstituteAdmin ? "/dashboard/institute-admin" : "/admin/dashboard"
+    const { data } = await api.get(endpoint)
+
+    const root = data?.data ?? data ?? {}
+
+    const statsSrc = root?.stats ?? root?.totals ?? {}
+    const recentSrc = root?.recent_institutes ?? root?.recentInstitutes ?? root?.institutes ?? []
+
+    const mappedStats: DashboardStats = {
+        institutes: Number(statsSrc?.institutes ?? statsSrc?.institutes_count ?? 0),
+        revenue: Number(statsSrc?.revenue ?? statsSrc?.total_revenue ?? 0),
+        institutes_count: Number(statsSrc?.institutes_count ?? statsSrc?.institutes ?? 0),
+        total_revenue: Number(statsSrc?.total_revenue ?? statsSrc?.revenue ?? 0),
+        parents: Number(statsSrc?.parents ?? 0),
+        circles: Number(statsSrc?.circles ?? statsSrc?.circles_count ?? 0),
+        teachers: Number(statsSrc?.teachers ?? statsSrc?.teachers_count ?? 0),
+        students: Number(statsSrc?.students ?? statsSrc?.students_count ?? 0),
+        students_count: Number(statsSrc?.students_count ?? statsSrc?.students ?? 0),
+    }
+
+    const mappedRecent = isInstituteAdmin ? [] : (Array.isArray(recentSrc) ? recentSrc : [])
 
     return {
-        stats: {
-            parents: Number(data?.stats?.parents ?? 0),
-            circles: Number(data?.stats?.circles ?? 0),
-            teachers: Number(data?.stats?.teachers ?? 0),
-            students: Number(data?.stats?.students ?? 0),
-        },
-        recentInstitutes: Array.isArray(data?.recent_institutes)
-            ? data.recent_institutes
-            : [],
+        stats: mappedStats,
+        recentInstitutes: mappedRecent,
     }
 }
 
@@ -140,4 +166,57 @@ export async function fetchParentDashboard(): Promise<ParentDashboardResponse> {
             ? data.notifications
             : [],
     }
+}
+
+/* ======================================================
+ * Teacher Stats (KPI endpoint)
+ * ====================================================== */
+
+export type TeacherStats = {
+    total_students: number
+    active_circles: number
+    today_attendance_percent: number
+    pending_exams: number
+}
+
+export async function listMyStats(): Promise<TeacherStats> {
+    const { data } = await api.get("/teacher/stats").catch(() => ({ data: {} as any }))
+    const root = data?.data ?? data ?? {}
+    return {
+        total_students: Number(root?.total_students ?? root?.students ?? 0),
+        active_circles: Number(root?.active_circles ?? root?.circles ?? 0),
+        today_attendance_percent: Number(
+            root?.today_attendance_percent ?? root?.today_attendance ?? 0,
+        ),
+        pending_exams: Number(root?.pending_exams ?? root?.exams ?? 0),
+    }
+}
+
+/* ======================================================
+ * Teacher Recent Activity
+ * ====================================================== */
+
+export type ActivityEntry = {
+    id?: number
+    type: "attendance" | "memorization" | "review" | "assessment" | "general"
+    student_name?: string | null
+    circle_name?: string | null
+    description: string
+    date: string
+}
+
+export async function listMyRecentActivity(): Promise<ActivityEntry[]> {
+    const { data } = await api
+        .get("/teacher/recent-activity")
+        .catch(() => ({ data: {} as any }))
+    const root = data?.data ?? data ?? {}
+    const src: any[] = Array.isArray(root) ? root : Array.isArray(root?.items) ? root.items : []
+    return src.map((item: any) => ({
+        id: item?.id ?? undefined,
+        type: (item?.type ?? "general") as ActivityEntry["type"],
+        student_name: item?.student_name ?? item?.student?.name ?? null,
+        circle_name: item?.circle_name ?? item?.circle?.name ?? null,
+        description: String(item?.description ?? item?.message ?? item?.note ?? ""),
+        date: String(item?.date ?? item?.created_at ?? ""),
+    }))
 }

@@ -6,7 +6,7 @@ import axios, {
 import { toast } from "sonner"
 
 /** إعدادات عامة */
-const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api"
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8001/api";
 const TOKEN_KEY = "token"
 
 /** دوال مساعدة للتوكن */
@@ -29,7 +29,7 @@ const api = axios.create({
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token: string | null = getToken()
 
- 
+
   config.headers = config.headers ?? ({} as any)
 
   if (token) {
@@ -116,3 +116,10 @@ api.interceptors.response.use(
 )
 
 export default api
+
+export const employees = {
+  tasksPeople: async (params?: Record<string, any>) => {
+    const { data } = await api.get("/employees/tasks-people", { params })
+    return data
+  },
+}

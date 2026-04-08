@@ -38,9 +38,12 @@ type Props<T> = {
 }
 
 function isColumnDefArray<T>(cols: AnyColumns<T>): cols is ColumnDef<T, any>[] {
-    // لو أول عنصر فيه accessorKey / accessorFn / id => ColumnDef
-    const c: any = (cols as any[])?.[0]
-    return !!c && ("accessorKey" in c || "accessorFn" in c || "id" in c)
+    // Check ANY column — the first column may be an id-less serial/index cell
+    // that looks like neither shape. SimpleColumn never uses `cell`, `accessorFn`,
+    // or `accessorKey`. Any of those keys anywhere in the array confirms ColumnDef.
+    return (cols as any[]).some(
+        (c: any) => !!c && ("accessorKey" in c || "accessorFn" in c || "id" in c || "cell" in c)
+    )
 }
 
 /** ✅ تحويل الأعمدة البسيطة إلى ColumnDef */
@@ -53,7 +56,7 @@ function toTanstackColumns<T>(cols: AnyColumns<T>): ColumnDef<T, any>[] {
 
         const col: ColumnDef<T, any> = {
             id: key || `col_${idx}`, // ✅ مهم لتفادي خطأ id
-            header: c.label,
+            header: () => c.label,
             accessorKey: key as any,
             cell: ({ row, getValue }) => {
                 if (typeof c.render === "function") return c.render(row.original)
@@ -86,6 +89,8 @@ export function DataTable<T>({
     const table = useReactTable({
         data,
         columns: columnsNormalized,
+        // Stable row identity: use data.id when present, fall back to row index
+        getRowId: (row: any, index) => String(row?.id ?? index),
         state: { sorting, columnFilters },
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
@@ -123,18 +128,18 @@ export function DataTable<T>({
     if (isLoading) {
         return (
             <div
-                className="w-full rounded-[28px] overflow-hidden"
+                className="w-full rounded-xl overflow-hidden border"
                 style={{
-                    background: "#fff",
-                    border: "1px solid rgba(0,61,53,.18)",
-                    boxShadow: "0 10px 30px rgba(0,0,0,.06)",
+                    background: "var(--surface)",
+                    borderColor: "var(--border)",
+                    boxShadow: "var(--shadow2)",
                 }}
             >
-                <div className="animate-pulse space-y-3 p-5">
-                    <div className="h-10 rounded-2xl" style={{ background: "rgba(0,61,53,.06)" }} />
-                    <div className="h-4 rounded-xl" style={{ background: "rgba(0,61,53,.08)" }} />
+                <div className="animate-pulse space-y-3 p-6">
+                    <div className="h-10 rounded-lg" style={{ background: "var(--surface2)" }} />
+                    <div className="h-4 rounded-lg" style={{ background: "var(--surface2)" }} />
                     {Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="h-3 rounded-xl" style={{ background: "rgba(0,61,53,.05)" }} />
+                        <div key={i} className="h-3 rounded-lg" style={{ background: "var(--surface2)" }} />
                     ))}
                 </div>
             </div>
@@ -144,40 +149,39 @@ export function DataTable<T>({
     const hasRows = table.getRowModel().rows.length > 0
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-4">
             {/* Toolbar */}
             <div
-                className="rounded-[28px] p-3 flex flex-col md:flex-row gap-2 md:items-center md:justify-between"
+                className="rounded-lg p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between border"
                 style={{
-                    background: "#fff",
-                    border: "1px solid rgba(0,61,53,.18)",
-                    boxShadow: "0 10px 30px rgba(0,0,0,.06)",
+                    background: "var(--surface)",
+                    borderColor: "var(--border)",
+                    boxShadow: "var(--shadow2)",
                 }}
             >
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                     <Input
                         value={globalSearch}
                         onChange={(e) => setGlobalSearch(e.target.value)}
                         placeholder={searchPlaceholder}
-                        className="h-10"
                         disabled={!safeSearchKey}
                     />
-                    <div className="text-[11px] mt-1" style={{ color: "rgba(2,8,7,.60)" }}>
-                        البحث يعمل على عمود: <span className="font-semibold">{safeSearchKey || "—"}</span>
+                    <div className="text-xs mt-2" style={{ color: "var(--muted)" }}>
+                        البحث على: <span className="font-medium" style={{ color: "var(--text)" }}>{safeSearchKey || "—"}</span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <div className="text-xs" style={{ color: "rgba(2,8,7,.60)" }}>
-                        حجم الصفحة
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                        العدد:
                     </div>
 
                     <select
-                        className="h-10 rounded-2xl px-3 text-sm"
+                        className="px-3 py-2 rounded-lg text-sm border transition-all"
                         style={{
-                            background: "#fff",
-                            border: "1px solid rgba(0,61,53,.22)",
-                            color: "#04110f",
+                            background: "var(--surface)",
+                            borderColor: "var(--border)",
+                            color: "var(--text)",
                         }}
                         value={table.getState().pagination.pageSize}
                         onChange={(e) => table.setPageSize(Number(e.target.value))}
@@ -191,6 +195,7 @@ export function DataTable<T>({
 
                     <Button
                         variant="outline"
+                        size="sm"
                         onClick={() => {
                             setGlobalSearch("")
                             table.resetColumnFilters()
@@ -204,18 +209,18 @@ export function DataTable<T>({
 
             {/* Table */}
             <div
-                className="w-full rounded-[28px] overflow-x-auto"
+                className="w-full rounded-lg overflow-x-auto border"
                 style={{
-                    background: "#fff",
-                    border: "1px solid rgba(0,61,53,.18)",
-                    boxShadow: "0 10px 30px rgba(0,0,0,.06)",
+                    background: "var(--surface)",
+                    borderColor: "var(--border)",
+                    boxShadow: "var(--shadow2)",
                 }}
             >
-                <table className="min-w-full text-sm">
+                <table className="w-full text-sm">
                     <thead
                         style={{
-                            background: "rgba(0,61,53,.03)",
-                            borderBottom: "1px solid rgba(0,61,53,.12)",
+                            background: "var(--surface2)",
+                            borderBottom: "1px solid var(--border)",
                         }}
                     >
                         {table.getHeaderGroups().map((hg) => (
@@ -225,7 +230,11 @@ export function DataTable<T>({
                                     const sort = header.column.getIsSorted()
 
                                     return (
-                                        <th key={header.id} className="px-4 py-3 text-right font-bold" style={{ color: "#04110f" }}>
+                                        <th
+                                            key={header.id}
+                                            className="px-6 py-4 text-right font-semibold"
+                                            style={{ color: "var(--text)" }}
+                                        >
                                             <div className="flex items-center gap-2 justify-start">
                                                 <div className="flex-1">
                                                     {header.isPlaceholder
@@ -235,19 +244,16 @@ export function DataTable<T>({
 
                                                 {canSort && (
                                                     <button
-                                                        className="p-1 rounded-xl transition"
-                                                        style={{ background: "transparent" }}
-                                                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,61,53,.06)")}
-                                                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                                                        className="p-1 rounded-lg transition hover:bg-[var(--surface)]"
                                                         onClick={header.column.getToggleSortingHandler()}
                                                         title="ترتيب"
                                                     >
                                                         {sort === "asc" ? (
-                                                            <PiCaretUpBold />
+                                                            <PiCaretUpBold style={{ color: "var(--brand)" }} />
                                                         ) : sort === "desc" ? (
-                                                            <PiCaretDownBold />
+                                                            <PiCaretDownBold style={{ color: "var(--brand)" }} />
                                                         ) : (
-                                                            <span style={{ opacity: 0.6 }}>↕</span>
+                                                            <span style={{ color: "var(--muted)", opacity: 0.5 }}>↕</span>
                                                         )}
                                                     </button>
                                                 )}
@@ -262,12 +268,12 @@ export function DataTable<T>({
                     <tbody>
                         {!hasRows ? (
                             <tr>
-                                <td colSpan={columnsNormalized.length} className="p-10 text-center">
-                                    <div className="text-sm font-semibold" style={{ color: "#04110f" }}>
+                                <td colSpan={columnsNormalized.length} className="p-12 text-center">
+                                    <div className="text-base font-semibold" style={{ color: "var(--text)" }}>
                                         لا توجد بيانات
                                     </div>
-                                    <div className="text-xs mt-1" style={{ color: "rgba(2,8,7,.60)" }}>
-                                        جرّب تغيير البحث أو إضافة عناصر جديدة.
+                                    <div className="text-sm mt-2" style={{ color: "var(--muted)" }}>
+                                        جرّب تغيير معايير البحث أو إضافة عناصر جديدة.
                                     </div>
                                 </td>
                             </tr>
@@ -275,13 +281,15 @@ export function DataTable<T>({
                             table.getRowModel().rows.map((row) => (
                                 <tr
                                     key={row.id}
-                                    className="transition"
-                                    style={{ background: "transparent", borderTop: "1px solid rgba(0,61,53,.10)" }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,61,53,.04)")}
-                                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                                    className="transition-colors border-t hover:bg-[var(--surface2)]"
+                                    style={{ borderColor: "var(--border)" }}
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <td key={cell.id} className="px-4 py-3" style={{ color: "#04110f" }}>
+                                        <td
+                                            key={cell.id}
+                                            className="px-6 py-4"
+                                            style={{ color: "var(--text)" }}
+                                        >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </td>
                                     ))}
@@ -294,29 +302,55 @@ export function DataTable<T>({
 
             {/* Pagination */}
             <div
-                className="rounded-[28px] p-3 flex flex-col md:flex-row gap-2 md:items-center md:justify-between"
+                className="rounded-lg p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between border"
                 style={{
-                    background: "#fff",
-                    border: "1px solid rgba(0,61,53,.18)",
-                    boxShadow: "0 10px 30px rgba(0,0,0,.06)",
+                    background: "var(--surface)",
+                    borderColor: "var(--border)",
+                    boxShadow: "var(--shadow2)",
                 }}
             >
-                <div className="text-xs" style={{ color: "rgba(2,8,7,.60)" }}>
-                    صفحة {table.getState().pagination.pageIndex + 1} من {table.getPageCount()} — الإجمالي:{" "}
-                    {table.getFilteredRowModel().rows.length}
+                <div className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                    صفحة <span style={{ color: "var(--brand)" }}>
+                        {table.getState().pagination.pageIndex + 1}
+                    </span> من <span style={{ color: "var(--brand)" }}>
+                        {table.getPageCount()}
+                    </span> — الإجمالي:{" "}
+                    <span style={{ color: "var(--brand)" }}>
+                        {table.getFilteredRowModel().rows.length}
+                    </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => table.firstPage()} disabled={!table.getCanPreviousPage()}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.firstPage()}
+                        disabled={!table.getCanPreviousPage()}
+                    >
                         أول
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                    >
                         السابق
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                    >
                         التالي
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => table.lastPage()} disabled={!table.getCanNextPage()}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.lastPage()}
+                        disabled={!table.getCanNextPage()}
+                    >
                         آخر
                     </Button>
                 </div>

@@ -10,6 +10,8 @@ import {
     PiClipboardTextBold,
     PiGearBold,
     PiBooksBold,
+    PiBriefcaseBold,
+    PiNotePencilBold,
 } from "react-icons/pi"
 
 export type Role =
@@ -67,10 +69,10 @@ export const NAV_SECTIONS: NavSection[] = [
             },
 
 
-            { key: "teacher_dash", label: "لوحة المعلم", to: "/teacher", icon: PiSquaresFourBold, roles: ["teacher"] },
+            { key: "teacher_dash", label: "لوحة المعلم", to: "/teacher/dashboard", icon: PiSquaresFourBold, roles: ["teacher"] },
             { key: "student_dash", label: "لوحة الطالب", to: "/student", icon: PiSquaresFourBold, roles: ["student"] },
             { key: "parent_dash", label: "لوحة ولي الأمر", to: "/parent", icon: PiSquaresFourBold, roles: ["parent"] },
-            { key: "employee_dash", label: "لوحة الموظف", to: "/employee", icon: PiSquaresFourBold, roles: ["employee"] },
+            { key: "employee_dash", label: "لوحة الموظف", to: "/employee/dashboard", icon: PiSquaresFourBold, roles: ["employee"] },
         ],
     },
 
@@ -107,6 +109,18 @@ export const NAV_SECTIONS: NavSection[] = [
             // Parent
             { key: "parent_children", label: "أبنائي", to: "/parent/children", icon: PiUsersThreeBold, roles: ["parent"] },
             { key: "parent_reports", label: "التقارير", to: "/parent/reports", icon: PiChartLineBold, roles: ["parent"] },
+        ],
+    },
+
+    {
+        key: "education_management",
+        label: "إدارة الشؤون",
+        roles: ALL_ADMINS,
+        items: [
+            { key: "edu_memorization", label: "الحفظ والمراجعة", to: "/dashboard/memorization", icon: PiBookOpenTextBold, roles: ALL_ADMINS },
+            { key: "edu_attendance", label: "الحضور والغياب", to: "/dashboard/attendance", icon: PiClipboardTextBold, roles: ALL_ADMINS },
+            { key: "edu_evaluations", label: "الاختبارات والتقييمات", to: "/dashboard/evaluations", icon: PiNotePencilBold, roles: ALL_ADMINS },
+            { key: "edu_staff", label: "مواظبة الموظفين", to: "/dashboard/staff-monitoring", icon: PiBriefcaseBold, roles: ALL_ADMINS },
         ],
     },
 

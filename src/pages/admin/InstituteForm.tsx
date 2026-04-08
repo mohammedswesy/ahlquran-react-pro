@@ -4,6 +4,7 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import FormError from "@/components/ui/form-error"
 import {
   Popover,
   PopoverContent,
@@ -16,7 +17,7 @@ import {
   CommandInput,
   CommandItem,
 } from "@/components/ui/command"
-import { ChevronsUpDown, Check } from "lucide-react"
+import { ChevronsUpDown, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import type { Institute } from "@/services/institutes"
@@ -25,7 +26,7 @@ import { listCities } from "@/services/cities"
 import { listOrganizations } from "@/services/organizations"
 import type { BaseRow } from "@/types/base"
 
-const schema = z.object({
+const baseSchema = z.object({
   name: z.string().min(2, "الاسم مطلوب"),
   country_id: z.coerce.number().int().min(1, "اختر الدولة"),
   city_id: z.coerce.number().int().min(1, "اختر المدينة"),
@@ -33,20 +34,30 @@ const schema = z.object({
   latitude: z.coerce.number().nullable().optional(),
   longitude: z.coerce.number().nullable().optional(),
   status: z.coerce.number().int().optional().default(1),
-
-  // 🟢 بيانات مدير المعهد (تستخدم فقط في الإنشاء)
-  admin_name: z.string().min(2, "اسم المدير قصير جدًا").or(z.literal("")).optional(),
-  admin_email: z.string().email("البريد غير صالح").or(z.literal("")).optional(),
-  admin_mobile: z.string().min(5, "رقم الجوال قصير").or(z.literal("")).optional(),
-  admin_password: z.string().min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل").or(z.literal("")).optional(),
 })
 
-export type InstituteFormValues = z.infer<typeof schema>
+// بيانات حساب المدير – مطلوبة في الإنشاء فقط
+const createSchema = baseSchema.extend({
+  manager_name: z.string().min(2, "اسم المدير مطلوب"),
+  manager_email: z.string().min(1, "البريد مطلوب").email("البريد الإلكتروني غير صالح"),
+  manager_password: z.string().min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل"),
+})
+
+const editSchema = baseSchema.extend({
+  manager_name: z.string().optional(),
+  manager_email: z.string().optional(),
+  manager_password: z.string().optional(),
+})
+
+export type InstituteFormValues = z.infer<typeof createSchema>
 
 type Props = {
   defaultValues?: Partial<Institute>
   onSubmit: (values: InstituteFormValues) => Promise<void> | void
   submitting?: boolean
+  serverErrors?: Partial<Record<keyof InstituteFormValues, string>>
+  formId?: string
+  showActions?: boolean
   /** create: نعرض حقول مدير المعهد - edit: نخفيها */
   mode?: "create" | "edit"
 }
@@ -55,8 +66,13 @@ export default function InstituteForm({
   defaultValues,
   onSubmit,
   submitting,
+  serverErrors,
+  formId,
+  showActions = true,
   mode = "edit",
 }: Props) {
+  const activeSchema = mode === "create" ? createSchema : editSchema
+
   const {
     register,
     handleSubmit,
@@ -65,7 +81,7 @@ export default function InstituteForm({
     setValue,
     formState: { errors },
   } = useForm<InstituteFormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(activeSchema),
     defaultValues: {
       name: "",
       country_id: 0,
@@ -75,11 +91,10 @@ export default function InstituteForm({
       longitude: null,
       status: 1,
 
-      // 🟢 افتراضيات مدير المعهد
-      admin_name: "",
-      admin_email: "",
-      admin_mobile: "",
-      admin_password: "",
+      // بيانات حساب المدير
+      manager_name: "",
+      manager_email: "",
+      manager_password: "",
       ...defaultValues,
     } as any,
   })
@@ -153,16 +168,20 @@ export default function InstituteForm({
         latitude: defaultValues.latitude ?? null,
         longitude: defaultValues.longitude ?? null,
         status: defaultValues.status ?? 1,
-
-        // في edit ما بنجيب بيانات مدير المعهد من الـ API، نخليها فاضية
-        admin_name: "",
-        admin_email: "",
-        admin_mobile: "",
-        admin_password: "",
+        // في edit لا نُعيد بيانات المدير
+        manager_name: "",
+        manager_email: "",
+        manager_password: "",
       } as any
       reset(dv)
     }
   }, [defaultValues, reset])
+
+  const getFieldError = (field: keyof InstituteFormValues): string | undefined => {
+    const client = errors[field]?.message
+    if (typeof client === "string" && client) return client
+    return serverErrors?.[field]
+  }
 
   // Labels
   const countryName = useMemo(
@@ -187,14 +206,15 @@ export default function InstituteForm({
 
   return (
     <form
+      id={formId}
       onSubmit={handleSubmit(async (v) => { await onSubmit(v) })}
       className="grid sm:grid-cols-2 gap-3"
       dir="rtl"
     >
       {/* الاسم */}
       <div className="sm:col-span-2">
-        <Input label="اسم المعهد" {...register("name")} />
-        {errors.name && <div className="text-red-600 text-xs mt-1">{errors.name.message}</div>}
+        <Input label="اسم المعهد" error={getFieldError("name")} {...register("name")} />
+        <FormError message={getFieldError("name")} />
       </div>
 
       {/* الدولة */}
@@ -234,9 +254,7 @@ export default function InstituteForm({
             </Command>
           </PopoverContent>
         </Popover>
-        {errors.country_id && (
-          <div className="text-red-600 text-xs mt-1">{errors.country_id.message}</div>
-        )}
+        <FormError message={getFieldError("country_id")} />
       </div>
 
       {/* المدينة */}
@@ -281,9 +299,7 @@ export default function InstituteForm({
             </Command>
           </PopoverContent>
         </Popover>
-        {errors.city_id && (
-          <div className="text-red-600 text-xs mt-1">{errors.city_id.message}</div>
-        )}
+        <FormError message={getFieldError("city_id")} />
       </div>
 
       {/* المنظمة (اختياري) */}
@@ -351,65 +367,62 @@ export default function InstituteForm({
         />
       </div>
 
-      {/* 🟢 سكشن مدير المعهد – فقط في الإنشاء */}
+      {/* بيانات مدير المعهد – فقط في الإنشاء */}
       {mode === "create" && (
         <div className="sm:col-span-2 mt-4 p-3 border rounded-lg space-y-3 bg-slate-50">
-          <div className="font-semibold text-sm text-gray-800">بيانات مدير المعهد (اختياري)</div>
-          <p className="text-xs text-gray-500">
-            يمكنك ترك هذه الحقول فارغة وسيتم إنشاء المعهد فقط، بدون إنشاء حساب مدير.
-          </p>
+          <div className="font-semibold text-sm text-gray-800">بيانات مدير المعهد</div>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
-              <Input label="اسم المدير" {...register("admin_name")} />
-              {errors.admin_name && (
-                <div className="text-red-600 text-xs mt-1">
-                  {errors.admin_name.message as string}
-                </div>
-              )}
-            </div>
-            <div>
-              <Input label="البريد الإلكتروني للمدير" type="email" {...register("admin_email")} />
-              {errors.admin_email && (
-                <div className="text-red-600 text-xs mt-1">
-                  {errors.admin_email.message as string}
-                </div>
-              )}
-            </div>
-            <div>
-              <Input label="جوال المدير" {...register("admin_mobile")} />
-              {errors.admin_mobile && (
-                <div className="text-red-600 text-xs mt-1">
-                  {errors.admin_mobile.message as string}
-                </div>
-              )}
+              <Input
+                label="اسم المدير"
+                type="text"
+                placeholder="أحمد محمد"
+                error={getFieldError("manager_name")}
+                {...register("manager_name")}
+              />
+              <FormError message={getFieldError("manager_name")} />
             </div>
             <div>
               <Input
-                label="كلمة مرور المدير (اختياري)"
-                type="password"
-                {...register("admin_password")}
+                label="البريد الإلكتروني للمدير"
+                type="email"
+                placeholder="admin@example.com"
+                error={getFieldError("manager_email")}
+                {...register("manager_email")}
               />
-              {errors.admin_password && (
-                <div className="text-red-600 text-xs mt-1">
-                  {errors.admin_password.message as string}
-                </div>
-              )}
-              <p className="text-[11px] text-gray-500 mt-1">
-                لو تركتها فارغة، السيرفر ممكن يولّد كلمة مرور عشوائية (حسب ما برمجناه في الباك إند).
-              </p>
+              <FormError message={getFieldError("manager_email")} />
+            </div>
+            <div>
+              <Input
+                label="كلمة مرور المدير"
+                type="password"
+                placeholder="********"
+                error={getFieldError("manager_password")}
+                {...register("manager_password")}
+              />
+              <FormError message={getFieldError("manager_password")} />
             </div>
           </div>
         </div>
       )}
 
-      <div className="sm:col-span-2 mt-2 flex gap-2">
-        <Button disabled={!!submitting} type="submit">
-          حفظ
-        </Button>
-        <Button type="button" variant="outline" onClick={() => reset()}>
-          إعادة ضبط
-        </Button>
-      </div>
+      {showActions && (
+        <div className="sm:col-span-2 mt-2 flex gap-2">
+          <Button disabled={!!submitting} type="submit">
+            {submitting ? (
+              <>
+                <Loader2 className="ml-2 size-4 animate-spin" />
+                جارٍ الحفظ…
+              </>
+            ) : (
+              "حفظ"
+            )}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => reset()}>
+            إعادة ضبط
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

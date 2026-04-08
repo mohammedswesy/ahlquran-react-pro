@@ -1,16 +1,20 @@
 // src/pages/admin/StudentsList.tsx
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { ColumnDef } from "@tanstack/react-table"
+import { useNavigate } from "react-router-dom"
 
 import { DataTable } from "@/components/ui/datatable"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Modal } from "@/components/ui/modal"
 import { toast } from "sonner"
 
 import ExportMenu from "@/components/app/ExportMenu"
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page"
+
+import Stat from "@/components/Stat"
+import { StatusBadge } from "@/components/ui/badge"
+import { Users, UserCheck, UserPlus } from "lucide-react"
 
 import {
   listStudents,
@@ -32,21 +36,20 @@ import {
   CommandItem,
 } from "@/components/ui/command"
 
-import { ChevronsUpDown, Check } from "lucide-react"
+import { ChevronsUpDown, Check, MoreHorizontal, Edit, Trash } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import StudentForm, { type StudentFormValues } from "./StudentForm"
 import SkeletonTable from "@/components/ui/skeleton-table"
 import EmptyState from "@/components/ui/empty-state"
+import LoadingBar from "@/components/ui/loading-bar"
+import ModalFormShell from "@/components/ui/modal-form-shell"
 
 export default function StudentsList() {
+  const nav = useNavigate()
   // ====== Table state ======
   const [rows, setRows] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
-
-  const [search, setSearch] = useState("")
-  const [page, setPage] = useState(1)
-  const [perPage] = useState(10)
   const [meta, setMeta] = useState<any>(null)
 
   const [openCreate, setOpenCreate] = useState(false)
@@ -120,19 +123,50 @@ export default function StudentsList() {
         cell: ({ row }) => row.original.circle?.name || "—",
       },
       {
+        id: "status",
+        header: "الحالة",
+        cell: ({ row }) => {
+          const status = row.original.status
+          if (status === 1) return StatusBadge.active()
+          if (status === 0) return StatusBadge.inactive()
+          return StatusBadge.pending()
+        },
+      },
+      {
         id: "actions",
         header: "إجراءات",
         cell: ({ row }) => {
           const r = row.original
           return (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setOpenEdit(r)}>
-                تعديل
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => onDelete(r.id)}>
-                حذف
-              </Button>
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-40" align="end">
+                <div className="space-y-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => setOpenEdit(r)}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    تعديل
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-destructive hover:text-destructive"
+                    onClick={() => onDelete(r.id)}
+                  >
+                    <Trash className="w-4 h-4 mr-2" />
+                    حذف
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           )
         },
       },
@@ -141,13 +175,11 @@ export default function StudentsList() {
   }, [])
 
   // ====== Load data ======
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await listStudents({
-        page,
-        per_page: perPage,
-        search,
+        per_page: 1000, // Load all for client-side pagination
         ...(filterInstituteId ? { institute_id: filterInstituteId } : {}),
         ...(filterCircleId ? { circle_id: filterCircleId } : {}),
       } as any)
@@ -163,14 +195,12 @@ export default function StudentsList() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterCircleId, filterInstituteId])
 
-  // debounce search + filters + page
+  // Load data when filters change
   useEffect(() => {
-    const id = setTimeout(() => load(), 350)
-    return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, page, filterInstituteId, filterCircleId])
+    load()
+  }, [load])
 
   // ====== Create / Edit / Delete ======
   const onCreate = async (v: StudentFormValues) => {
@@ -180,6 +210,7 @@ export default function StudentsList() {
       setRows((prev) => [created, ...prev])
       setOpenCreate(false)
       toast.success("تمت الإضافة بنجاح")
+      nav("/admin/students", { replace: true })
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "فشل الإضافة")
     } finally {
@@ -195,6 +226,7 @@ export default function StudentsList() {
       setRows((prev) => prev.map((r) => (r.id === openEdit.id ? updated : r)))
       setOpenEdit(null)
       toast.success("تم التعديل بنجاح")
+      nav("/admin/students", { replace: true })
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "فشل التعديل")
     } finally {
@@ -218,15 +250,14 @@ export default function StudentsList() {
   const circleName = (id?: number) => circleOptions.find((c) => c.id === id)?.name || "اختر الحلقة…"
 
   const clearFilters = () => {
-    setPage(1)
-    setSearch("")
     setFilterInstituteId(undefined)
     setFilterCircleId(undefined)
   }
 
   // ====== Render ======
   return (
-    <div className="space-y-4" dir="rtl">
+    <div className="space-y-6" dir="rtl">
+      <LoadingBar active={loading} />
       <PageHeader
         title="الطلاب"
         subtitle="إدارة الطلاب (بحث + فلاتر + إضافة/تعديل/حذف) مع تصدير."
@@ -240,21 +271,36 @@ export default function StudentsList() {
         }
       />
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Stat
+          label="إجمالي الطلاب"
+          value={meta?.total || rows.length}
+          icon={<Users className="w-6 h-6" />}
+          color="primary"
+        />
+        <Stat
+          label="الطلاب النشطين"
+          value={rows.filter(s => s.status === 1).length}
+          icon={<UserCheck className="w-6 h-6" />}
+          color="success"
+        />
+        <Stat
+          label="طلاب جدد هذا الشهر"
+          value={rows.filter(s => {
+            if (!s.created_at) return false
+            const created = new Date(s.created_at)
+            const now = new Date()
+            return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear()
+          }).length}
+          icon={<UserPlus className="w-6 h-6" />}
+          color="warning"
+        />
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-end gap-3">
-            <div className="w-full sm:w-[260px]">
-              <Input
-                label="بحث"
-                placeholder="ابحث باسم الطالب…"
-                value={search}
-                onChange={(e) => {
-                  setPage(1)
-                  setSearch(e.target.value)
-                }}
-              />
-            </div>
-
             {/* Filter: Institute */}
             <div className="min-w-[220px]">
               <label className="block text-sm text-gray-700 mb-1">المعهد</label>
@@ -274,7 +320,6 @@ export default function StudentsList() {
                         key={0}
                         value="الكل"
                         onSelect={() => {
-                          setPage(1)
                           setFilterInstituteId(undefined)
                           setFilterCircleId(undefined)
                           setInstOpen(false)
@@ -289,7 +334,6 @@ export default function StudentsList() {
                           key={i.id}
                           value={i.name}
                           onSelect={() => {
-                            setPage(1)
                             setFilterInstituteId(i.id)
                             setInstOpen(false)
                           }}
@@ -329,7 +373,6 @@ export default function StudentsList() {
                         key={0}
                         value="الكل"
                         onSelect={() => {
-                          setPage(1)
                           setFilterCircleId(undefined)
                           setCircleOpen(false)
                         }}
@@ -343,7 +386,6 @@ export default function StudentsList() {
                           key={c.id}
                           value={c.name}
                           onSelect={() => {
-                            setPage(1)
                             setFilterCircleId(c.id)
                             setCircleOpen(false)
                           }}
@@ -369,57 +411,37 @@ export default function StudentsList() {
         </CardHeader>
 
         <CardContent>
-          {loading ? (
-            <SkeletonTable rows={8} cols={6} />
-          ) : rows.length === 0 ? (
-            <EmptyState
-              title="لا توجد بيانات طلاب"
-              desc="أضف أول طالب للبدء."
-              actionLabel="إضافة طالب"
-              onAction={() => setOpenCreate(true)}
-            />
-          ) : (
-            <DataTable columns={columns} data={rows} isLoading={false} />
-          )}
-
-          {/* Pagination */}
-          {meta && (
-            <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-              <div>
-                صفحة {meta.current_page} من {meta.last_page}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  السابق
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= meta.last_page}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  التالي
-                </Button>
-              </div>
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            data={rows}
+            isLoading={loading}
+            searchKey="name"
+            searchPlaceholder="البحث في أسماء الطلاب..."
+          />
         </CardContent>
       </Card>
 
       {/* Create */}
-      <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="إضافة طالب" footer={null}>
-        <StudentForm submitting={submitting} onSubmit={onCreate} />
-      </Modal>
+      <ModalFormShell
+        open={openCreate}
+        onClose={() => setOpenCreate(false)}
+        title="إضافة طالب"
+        formId="student-create-form"
+        submitting={submitting}
+      >
+        <StudentForm formId="student-create-form" showActions={false} submitting={submitting} onSubmit={onCreate} />
+      </ModalFormShell>
 
       {/* Edit */}
-      <Modal open={!!openEdit} onClose={() => setOpenEdit(null)} title="تعديل طالب" footer={null}>
-        <StudentForm submitting={submitting} defaultValues={openEdit ?? undefined} onSubmit={onEdit} />
-      </Modal>
+      <ModalFormShell
+        open={!!openEdit}
+        onClose={() => setOpenEdit(null)}
+        title="تعديل طالب"
+        formId="student-edit-form"
+        submitting={submitting}
+      >
+        <StudentForm formId="student-edit-form" showActions={false} submitting={submitting} defaultValues={openEdit ?? undefined} onSubmit={onEdit} />
+      </ModalFormShell>
     </div>
   )
 }

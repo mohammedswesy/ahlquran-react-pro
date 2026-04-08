@@ -67,6 +67,20 @@ body,
   border-radius: 999px;
 }
 
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 61, 53, 0.38);
+}
+
+@keyframes loading-bar {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(420%);
+  }
+}
+
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
   * {

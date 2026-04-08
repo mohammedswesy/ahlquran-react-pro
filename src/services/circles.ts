@@ -137,6 +137,23 @@ export type TeacherCircle = {
     [k: string]: any
 }
 
+export type StudentCircle = {
+    id: number
+    name: string
+    teacher_name?: string | null
+    schedule?: string | null
+    [k: string]: any
+}
+
+export type CircleStudent = {
+    id: number
+    name: string
+    mobile?: string | null
+    email?: string | null
+    status?: string | null
+    [k: string]: any
+}
+
 function normalizeTeacherCircle(raw: any): TeacherCircle {
     const x = normalizeId(raw)
     return {
@@ -158,4 +175,63 @@ export async function listMyCircles(): Promise<TeacherCircle[]> {
                     []
 
     return src.map(normalizeTeacherCircle)
+}
+
+export async function getMyCircle(id: number): Promise<TeacherCircle> {
+    const { data } = await api.get(`/teacher/circles/${id}`)
+    return normalizeTeacherCircle(data?.data ?? data)
+}
+
+export async function listMyCircleStudents(circleId: number): Promise<CircleStudent[]> {
+    const { data } = await api.get(`/teacher/circles/${circleId}/students`)
+    const src = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+    return src.map((x: any) => {
+        const n = normalizeId(x)
+        return {
+            ...n,
+            id: Number(n.id),
+            name: String(n.name ?? "").trim(),
+            mobile: n.mobile ?? n.phone ?? null,
+            email: n.email ?? null,
+            status: n.status ?? null,
+        }
+    })
+}
+
+export async function listCircleStudents(circleId: number): Promise<CircleStudent[]> {
+    try {
+        const { data } = await api.get(`/circles/${circleId}/students`)
+        const src = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+        return src.map((x: any) => {
+            const n = normalizeId(x)
+            return {
+                ...n,
+                id: Number(n.id),
+                name: String(n.name ?? n.student_name ?? "").trim(),
+                mobile: n.mobile ?? n.phone ?? null,
+                email: n.email ?? null,
+                status: n.status ?? null,
+            }
+        })
+    } catch {
+        return listMyCircleStudents(circleId)
+    }
+}
+
+export async function listStudentCircles(): Promise<StudentCircle[]> {
+    const { data } = await api.get("/student/circles")
+    const src = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
+    return src.map((x: any) => {
+        const n = normalizeId(x)
+        const schedule = typeof n.schedule === "string"
+            ? n.schedule
+            : n.schedule?.text ?? n.schedule_label ?? null
+        return {
+            ...n,
+            id: Number(n.id),
+            name: String(n.name ?? "").trim(),
+            teacher_name: n.teacher_name ?? n.teacher?.name ?? null,
+            schedule,
+        }
+    })
 }

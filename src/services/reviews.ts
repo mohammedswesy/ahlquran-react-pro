@@ -3,6 +3,7 @@ import { normalizeId } from "@/lib/normalize"
 
 export type ReviewRecord = {
   id: number
+  student_id?: number | null
   session_date: string // YYYY-MM-DD
   pages_count?: number | null
   evaluation?: number | null
@@ -24,6 +25,7 @@ function normalizeReviewRecord(raw: any): ReviewRecord {
   const range = x.range ?? {}
   return {
     id: x.id,
+    student_id: x.student_id ?? x.student?.id ?? null,
     session_date: String(x.session_date ?? ""),
     pages_count: x.pages_count ?? null,
     evaluation: x.evaluation ?? null,

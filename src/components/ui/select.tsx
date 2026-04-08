@@ -17,15 +17,20 @@ export const SelectTrigger = React.forwardRef<
     <RadixSelect.Trigger
         ref={ref}
         className={cn(
-            "inline-flex w-full items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2 text-sm",
-            "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600",
+            "inline-flex w-full items-center justify-between gap-2 rounded-lg border px-4 py-2.5 text-sm transition-all",
+            "focus:outline-none focus:ring-2 focus:border-[var(--brand)]",
             className
         )}
+        style={{
+            background: "var(--surface)",
+            borderColor: "var(--border)",
+            color: "var(--text)",
+        }}
         {...props}
     >
         {children}
         <RadixSelect.Icon>
-            <ChevronsUpDown className="size-4 opacity-60" />
+            <ChevronsUpDown className="size-4" style={{ color: "var(--muted)" }} />
         </RadixSelect.Icon>
     </RadixSelect.Trigger>
 ))
@@ -39,14 +44,19 @@ export const SelectContent = React.forwardRef<
         <RadixSelect.Content
             ref={ref}
             className={cn(
-                "z-50 min-w-[8rem] overflow-hidden rounded-xl border bg-white shadow-lg",
+                "z-50 min-w-[8rem] overflow-hidden rounded-lg border shadow-lg",
                 className
             )}
+            style={{
+                background: "var(--surface)",
+                borderColor: "var(--border)",
+                boxShadow: "var(--shadow)",
+            }}
             position="popper"
             sideOffset={8}
             {...props}
         >
-            <RadixSelect.Viewport className="p-1">{children}</RadixSelect.Viewport>
+            <RadixSelect.Viewport className="p-2">{children}</RadixSelect.Viewport>
         </RadixSelect.Content>
     </RadixSelect.Portal>
 ))
@@ -59,14 +69,17 @@ export const SelectItem = React.forwardRef<
     <RadixSelect.Item
         ref={ref}
         className={cn(
-            "relative flex cursor-pointer select-none items-center rounded-lg px-2 py-2 text-sm outline-none",
-            "data-[highlighted]:bg-emerald-50 data-[highlighted]:text-emerald-900",
+            "relative flex cursor-pointer select-none items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors",
+            "data-[highlighted]:bg-[rgba(0,61,53,0.1)]",
             className
         )}
+        style={{
+            color: "var(--text)",
+        }}
         {...props}
     >
         <RadixSelect.ItemIndicator className="absolute left-2 rtl:left-auto rtl:right-2">
-            <Check className="size-4" />
+            <Check className="size-4" style={{ color: "var(--brand)" }} />
         </RadixSelect.ItemIndicator>
         <RadixSelect.ItemText>{children}</RadixSelect.ItemText>
     </RadixSelect.Item>

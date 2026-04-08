@@ -1,15 +1,17 @@
 // src/pages/admin/TeachersList.tsx
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { ColumnDef } from "@tanstack/react-table"
+import { useNavigate } from "react-router-dom"
 import { toast } from "sonner"
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { DataTable } from "@/components/ui/datatable"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Modal } from "@/components/ui/modal"
 import SkeletonTable from "@/components/ui/skeleton-table"
 import EmptyState from "@/components/ui/empty-state"
+import LoadingBar from "@/components/ui/loading-bar"
+import ModalFormShell from "@/components/ui/modal-form-shell"
 
 import {
   listTeachers,
@@ -36,6 +38,7 @@ import { cn } from "@/lib/utils"
 import TeacherForm, { type TeacherFormValues } from "./TeacherForm"
 
 export default function TeachersList() {
+  const nav = useNavigate()
   const [rows, setRows] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -47,6 +50,7 @@ export default function TeachersList() {
   const [openCreate, setOpenCreate] = useState(false)
   const [openEdit, setOpenEdit] = useState<Teacher | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [createServerErrors, setCreateServerErrors] = useState<Partial<Record<keyof TeacherFormValues, string>>>({})
 
   const [filterInstituteId, setFilterInstituteId] = useState<number | undefined>()
   const [filterCircleId, setFilterCircleId] = useState<number | undefined>()
@@ -87,17 +91,26 @@ export default function TeachersList() {
 
   const columns = useMemo<ColumnDef<Teacher>[]>(
     () => [
-      { header: "#", cell: ({ row }) => row.index + 1 },
-      { accessorKey: "name", header: "اسم المعلّم" },
+      { id: "serial", header: "#", cell: ({ row }) => row.index + 1 },
+      { id: "name", accessorKey: "name", header: "اسم المعلّم" },
       {
         id: "gender",
         header: "النوع",
         cell: ({ row }) => ((row.original.gender || "") === "female" ? "أنثى" : "ذكر"),
       },
-      { accessorKey: "email", header: "البريد", cell: ({ getValue }) => getValue() || "—" },
-      { accessorKey: "phone", header: "الهاتف", cell: ({ getValue }) => getValue() || "—" },
+      { id: "email", accessorKey: "email", header: "البريد", cell: ({ getValue }) => getValue() || "—" },
+      { id: "phone", accessorKey: "phone", header: "الهاتف", cell: ({ getValue }) => getValue() || "—" },
       { id: "institute", header: "المعهد", cell: ({ row }) => row.original.institute?.name || "—" },
       { id: "circle", header: "الحلقة", cell: ({ row }) => row.original.circle?.name || "—" },
+      {
+        id: "user_status",
+        header: "حساب المستخدم",
+        cell: ({ row }) => {
+          const userId = (row.original as any).user_id
+          if (userId) return <span className="text-green-600 font-semibold">✓ مرتبط</span>
+          return <span className="text-gray-500">—</span>
+        },
+      },
       {
         id: "actions",
         header: "إجراءات",
@@ -119,7 +132,7 @@ export default function TeachersList() {
     []
   )
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await listTeachers({
@@ -141,22 +154,33 @@ export default function TeachersList() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterCircleId, filterInstituteId, page, perPage, search])
 
   useEffect(() => {
     const id = setTimeout(() => load(), 350)
     return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, page, filterInstituteId, filterCircleId])
+  }, [load])
 
   const onCreate = async (v: TeacherFormValues) => {
     setSubmitting(true)
+    setCreateServerErrors({})
     try {
       const created = await createTeacher(v)
       setRows((prev) => [created, ...prev])
       setOpenCreate(false)
       toast.success("تمت الإضافة بنجاح")
+      nav("/admin/teachers", { replace: true })
     } catch (e: any) {
+      const backendErrors = (e?.response?.data?.errors ?? {}) as Record<string, string | string[]>
+      const nextErrors: Partial<Record<keyof TeacherFormValues, string>> = {}
+      // Map common backend error fields
+      for (const key of ["name", "email", "password", "phone", "hire_date", "institute_id", "circle_id"] as const) {
+        const err = backendErrors[key]
+        if (err) {
+          nextErrors[key] = Array.isArray(err) ? String(err[0] ?? "") : String(err)
+        }
+      }
+      setCreateServerErrors(nextErrors)
       toast.error(e?.response?.data?.message || "فشل الإضافة")
     } finally {
       setSubmitting(false)
@@ -171,6 +195,7 @@ export default function TeachersList() {
       setRows((prev) => prev.map((r) => (r.id === openEdit.id ? updated : r)))
       setOpenEdit(null)
       toast.success("تم التعديل بنجاح")
+      nav("/admin/teachers", { replace: true })
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "فشل التعديل")
     } finally {
@@ -194,6 +219,7 @@ export default function TeachersList() {
 
   return (
     <div className="space-y-4" dir="rtl">
+      <LoadingBar active={loading} />
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-end gap-2">
@@ -359,13 +385,28 @@ export default function TeachersList() {
         </CardContent>
       </Card>
 
-      <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="إضافة معلّم" footer={null}>
-        <TeacherForm submitting={submitting} onSubmit={onCreate} />
-      </Modal>
+      <ModalFormShell
+        open={openCreate}
+        onClose={() => {
+          setOpenCreate(false)
+          setCreateServerErrors({})
+        }}
+        title="إضافة معلّم"
+        formId="teacher-create-form"
+        submitting={submitting}
+      >
+        <TeacherForm formId="teacher-create-form" showActions={false} submitting={submitting} onSubmit={onCreate} serverErrors={createServerErrors} />
+      </ModalFormShell>
 
-      <Modal open={!!openEdit} onClose={() => setOpenEdit(null)} title="تعديل معلّم" footer={null}>
-        <TeacherForm submitting={submitting} defaultValues={openEdit ?? undefined} onSubmit={onEdit} />
-      </Modal>
+      <ModalFormShell
+        open={!!openEdit}
+        onClose={() => setOpenEdit(null)}
+        title="تعديل معلّم"
+        formId="teacher-edit-form"
+        submitting={submitting}
+      >
+        <TeacherForm formId="teacher-edit-form" showActions={false} submitting={submitting} defaultValues={openEdit ?? undefined} onSubmit={onEdit} />
+      </ModalFormShell>
     </div>
   )
 }

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { DataTable } from "@/components/ui/datatable"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Modal } from "@/components/ui/modal"
+import LoadingBar from "@/components/ui/loading-bar"
 import { toast } from "sonner"
 import type { ColumnDef } from "@tanstack/react-table"
 
@@ -19,6 +19,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
 import { ChevronsUpDown, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
+import ModalFormShell from "@/components/ui/modal-form-shell"
 
 import EmployeeForm, { type EmployeeFormValues } from "./EmployeeForm"
 
@@ -40,6 +41,7 @@ export default function EmployeesList() {
   const [openCreate, setOpenCreate] = useState(false)
   const [openEdit, setOpenEdit] = useState<Employee | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [createServerErrors, setCreateServerErrors] = useState<Partial<Record<keyof EmployeeFormValues, string>>>({})
 
   // Filters
   const [filterRole, setFilterRole] = useState<string | undefined>(undefined)
@@ -94,13 +96,16 @@ export default function EmployeesList() {
     },
 
     {
-      id: "institute",
-      header: "المعهد",
-      cell: ({ row }) => row.original.institute?.name || "—",
+      id: "user_status",
+      header: "حساب المستخدم",
+      cell: ({ row }) => {
+        const userId = (row.original as any).user_id
+        if (userId) return <span className="text-green-600 font-semibold">✓ مرتبط</span>
+        return <span className="text-gray-500">—</span>
+      },
     },
 
     {
-      id: "actions",
       header: "إجراءات",
       cell: ({ row }) => {
         const r = row.original
@@ -118,7 +123,7 @@ export default function EmployeesList() {
     },
   ], [])
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const res = await listEmployees({
@@ -142,23 +147,32 @@ export default function EmployeesList() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterInstituteId, filterRole, page, perPage, search])
 
   useEffect(() => {
     const id = setTimeout(() => load(), 350)
     return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, page, filterRole, filterInstituteId])
+  }, [load])
 
   const onCreate = async (v: EmployeeFormValues) => {
     setSubmitting(true)
+    setCreateServerErrors({})
     try {
       const created = await createEmployee(v)
-      // ✅ created ممكن يرجع object واحد، فبنضيفه فوق
       setRows((prev) => [created as any, ...prev])
       setOpenCreate(false)
       toast.success("تمت الإضافة بنجاح")
     } catch (e: any) {
+      const backendErrors = (e?.response?.data?.errors ?? {}) as Record<string, string | string[]>
+      const nextErrors: Partial<Record<keyof EmployeeFormValues, string>> = {}
+      // Map common backend error fields
+      for (const key of ["name", "email", "password", "phone", "job_title", "role", "hire_date", "institute_id"] as const) {
+        const err = backendErrors[key]
+        if (err) {
+          nextErrors[key] = Array.isArray(err) ? String(err[0] ?? "") : String(err)
+        }
+      }
+      setCreateServerErrors(nextErrors)
       toast.error(e?.response?.data?.message || "فشل الإضافة")
     } finally {
       setSubmitting(false)
@@ -196,6 +210,7 @@ export default function EmployeesList() {
 
   return (
     <div className="space-y-4" dir="rtl">
+      <LoadingBar active={loading} />
       <div className="flex flex-wrap items-end gap-2">
         <Input
           label="بحث"
@@ -320,13 +335,13 @@ export default function EmployeesList() {
         </div>
       )}
 
-      <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="إضافة موظف" footer={null}>
-        <EmployeeForm submitting={submitting} onSubmit={onCreate} />
-      </Modal>
+      <ModalFormShell open={openCreate} onClose={() => { setOpenCreate(false); setCreateServerErrors({}) }} title="إضافة موظف" formId="employee-create-form" submitting={submitting}>
+        <EmployeeForm formId="employee-create-form" showActions={false} submitting={submitting} onSubmit={onCreate} serverErrors={createServerErrors} />
+      </ModalFormShell>
 
-      <Modal open={!!openEdit} onClose={() => setOpenEdit(null)} title="تعديل موظف" footer={null}>
-        <EmployeeForm submitting={submitting} defaultValues={openEdit ?? undefined} onSubmit={onEdit} />
-      </Modal>
+      <ModalFormShell open={!!openEdit} onClose={() => setOpenEdit(null)} title="تعديل موظف" formId="employee-edit-form" submitting={submitting}>
+        <EmployeeForm formId="employee-edit-form" showActions={false} submitting={submitting} defaultValues={openEdit ?? undefined} onSubmit={onEdit} />
+      </ModalFormShell>
     </div>
   )
 }

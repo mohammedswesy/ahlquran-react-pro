@@ -345,7 +345,7 @@ export default function Reports() {
           <CardHeader className="pb-2"><div className="font-bold">اتجاه الحضور حسب اليوم</div></CardHeader>
           <CardContent>
             {chartData.length === 0 ? (
-              <EmptyState title="لا يوجد بيانات" description="جرّب تغيير الفلاتر أو نطاق التاريخ." />
+              <EmptyState title="لا يوجد بيانات" desc="جرّب تغيير الفلاتر أو نطاق التاريخ." />
             ) : (
               <div style={{ width: "100%", height: 320 }}>
                 <ResponsiveContainer>
@@ -415,9 +415,9 @@ export default function Reports() {
             {loading ? (
               <SkeletonTable rows={8} />
             ) : error ? (
-              <EmptyState title="خطأ" description={error} />
+              <EmptyState title="خطأ" desc={error} />
             ) : rows.length === 0 ? (
-              <EmptyState title="لا يوجد بيانات" description="لا يوجد سجلات ضمن الفلاتر الحالية." />
+              <EmptyState title="لا يوجد بيانات" desc="لا يوجد سجلات ضمن الفلاتر الحالية." />
             ) : (
               <>
                 <div className="overflow-auto">

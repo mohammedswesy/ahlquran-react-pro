@@ -27,6 +27,16 @@ export type Institute = {
   [k: string]: any
 }
 
+export type AdminCredentials = {
+  email: string
+  password: string
+}
+
+export type CreateInstituteResult = {
+  institute: Institute
+  admin_credentials?: AdminCredentials | null
+}
+
 export type ListParams = { page?: number; per_page?: number; search?: string }
 export type Paginated<T> = {
   data: T[]
@@ -45,21 +55,32 @@ function normalizeInstitute(raw: any): Institute {
 // ========== API Calls ==========
 export async function listInstitutes(
   params?: ListParams
-): Promise<Institute[] | Paginated<Institute>> {
+): Promise<{ data: Institute[]; meta: Record<string, any> | null }> {
   const res = await api.get("/institutes", { params })
 
+  // Debug — remove once data flow is confirmed
+  console.log("[listInstitutes] raw API response:", res.data)
+
+  let items: any[] = []
+  let meta: Record<string, any> | null = null
+
   if (Array.isArray(res.data)) {
-    return res.data.map(normalizeInstitute)
+    // plain array (non-paginated collection)
+    items = res.data
+  } else if (Array.isArray(res.data?.data)) {
+    // standard Laravel paginator: { data:[…], links:{…}, meta:{…} }
+    items = res.data.data
+    meta = res.data.meta ?? null
+  } else if (Array.isArray(res.data?.data?.data)) {
+    // double-wrapped edge case
+    items = res.data.data.data
+    meta = res.data.data.meta ?? null
   }
 
-  if (Array.isArray(res.data?.data)) {
-    return {
-      ...res.data,
-      data: res.data.data.map(normalizeInstitute),
-    } as Paginated<Institute>
-  }
+  const data = items.map(normalizeInstitute)
+  console.log("[listInstitutes] extracted rows:", data, "meta:", meta)
 
-  return res.data
+  return { data, meta }
 }
 
 export async function getInstitute(id: number): Promise<Institute> {
@@ -71,10 +92,31 @@ export async function getInstitute(id: number): Promise<Institute> {
 // إنشاء معهد جديد
 export async function createInstitute(
   payload: InstituteFormValues
-): Promise<Institute> {
+): Promise<CreateInstituteResult> {
   const res = await api.post("/institutes", payload)
-  const item = res.data?.data ?? res.data
-  return normalizeInstitute(item)
+  const root = res.data?.data ?? res.data ?? {}
+
+  const instituteRaw =
+    root?.institute ??
+    root?.record ??
+    root
+
+  const credsRaw =
+    root?.admin_credentials ??
+    res.data?.admin_credentials ??
+    null
+
+  const admin_credentials = credsRaw
+    ? {
+        email: String(credsRaw.email ?? "").trim(),
+        password: String(credsRaw.password ?? credsRaw.plain_text_password ?? "").trim(),
+      }
+    : null
+
+  return {
+    institute: normalizeInstitute(instituteRaw),
+    admin_credentials,
+  }
 }
 
 // تعديل معهد

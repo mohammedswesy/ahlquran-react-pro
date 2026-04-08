@@ -4,6 +4,7 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import FormError from "@/components/ui/form-error"
 import {
   Popover, PopoverTrigger, PopoverContent,
 } from "@/components/ui/popover"
@@ -15,7 +16,8 @@ import { cn } from "@/lib/utils"
 
 import type { Student } from "@/services/students"
 import { listInstitutesOptions } from "@/services/institutes"
-import { listCirclesByInstitute, type Circle } from "@/services/circles"
+import { listCircles, listCirclesByInstitute, type Circle } from "@/services/circles"
+import { useAuth } from "@/store/auth"
 
 const schema = z.object({
   name: z.string().min(2, "الاسم مطلوب"),
@@ -32,9 +34,14 @@ type Props = {
   defaultValues?: Partial<Student>
   onSubmit: (values: StudentFormValues) => Promise<void> | void
   submitting?: boolean
+  formId?: string
+  showActions?: boolean
 }
 
-export default function StudentForm({ defaultValues, onSubmit, submitting }: Props) {
+export default function StudentForm({ defaultValues, onSubmit, submitting, formId, showActions = true }: Props) {
+  const role = useAuth((s) => s.role)
+  const isInstituteAdmin = role === "institute-admin"
+
   const {
     register, handleSubmit, reset, watch, setValue, formState: { errors }
   } = useForm<StudentFormValues>({
@@ -62,22 +69,31 @@ export default function StudentForm({ defaultValues, onSubmit, submitting }: Pro
   const [openCircle, setOpenCircle] = useState(false)
 
   useEffect(() => {
-    (async () => {
+    if (isInstituteAdmin) return
+    ;(async () => {
       const opts = await listInstitutesOptions()
       setInstitutes(opts)
     })()
-  }, [])
+  }, [isInstituteAdmin])
 
   useEffect(() => {
+    if (isInstituteAdmin) {
+      ;(async () => {
+        const scoped = await listCircles({ per_page: 1000 })
+        setCircles(scoped?.data ?? [])
+      })()
+      return
+    }
+
     if (!instituteId) { setCircles([]); setValue("circle_id", undefined); return }
-    (async () => {
+    ;(async () => {
       const list = await listCirclesByInstitute(instituteId)
       setCircles(list)
       const current = watch("circle_id")
       if (!list.some(c => c.id === current)) setValue("circle_id", undefined)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instituteId])
+  }, [instituteId, isInstituteAdmin])
 
   useEffect(() => {
     if (defaultValues) {
@@ -100,10 +116,10 @@ export default function StudentForm({ defaultValues, onSubmit, submitting }: Pro
   )
 
   return (
-    <form onSubmit={handleSubmit(async (v) => { await onSubmit(v) })} className="grid sm:grid-cols-2 gap-3" dir="rtl">
+    <form id={formId} onSubmit={handleSubmit(async (v) => { await onSubmit(v) })} className="grid sm:grid-cols-2 gap-3" dir="rtl">
       <div className="sm:col-span-2">
-        <Input label="اسم الطالب" {...register("name")} />
-        {errors.name && <div className="text-red-600 text-xs mt-1">{errors.name.message}</div>}
+        <Input label="اسم الطالب" error={errors.name?.message} {...register("name")} />
+        <FormError message={errors.name?.message} />
       </div>
 
       <div>
@@ -126,47 +142,48 @@ export default function StudentForm({ defaultValues, onSubmit, submitting }: Pro
         <Input label="الهاتف" {...register("phone")} />
       </div>
 
-      {/* المعهد */}
-      <div>
-        <label className="block text-sm text-gray-700 mb-1">المعهد</label>
-        <Popover open={openInstitute} onOpenChange={setOpenInstitute}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" role="combobox" className="w-full justify-between">
-              {instituteName}
-              <ChevronsUpDown className="opacity-50 size-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[260px] p-0" align="end">
-            <Command>
-              <CommandInput placeholder="ابحث عن معهد…" className="text-right" />
-              <CommandEmpty>لا توجد نتائج.</CommandEmpty>
-              <CommandGroup>
-                {institutes.map((i) => (
-                  <CommandItem
-                    key={i.id}
-                    value={i.name}
-                    onSelect={() => {
-                      setValue("institute_id", i.id, { shouldDirty: true, shouldValidate: true })
-                      setOpenInstitute(false)
-                    }}
-                  >
-                    <Check className={cn("ml-2 size-4", i.id === instituteId ? "opacity-100" : "opacity-0")} />
-                    {i.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </Command>
-          </PopoverContent>
-        </Popover>
-        {errors.institute_id && <div className="text-red-600 text-xs mt-1">{errors.institute_id.message}</div>}
-      </div>
+      {!isInstituteAdmin && (
+        <div>
+          <label className="block text-sm text-gray-700 mb-1">المعهد</label>
+          <Popover open={openInstitute} onOpenChange={setOpenInstitute}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" className="w-full justify-between">
+                {instituteName}
+                <ChevronsUpDown className="opacity-50 size-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[260px] p-0" align="end">
+              <Command>
+                <CommandInput placeholder="ابحث عن معهد…" className="text-right" />
+                <CommandEmpty>لا توجد نتائج.</CommandEmpty>
+                <CommandGroup>
+                  {institutes.map((i) => (
+                    <CommandItem
+                      key={i.id}
+                      value={i.name}
+                      onSelect={() => {
+                        setValue("institute_id", i.id, { shouldDirty: true, shouldValidate: true })
+                        setOpenInstitute(false)
+                      }}
+                    >
+                      <Check className={cn("ml-2 size-4", i.id === instituteId ? "opacity-100" : "opacity-0")} />
+                      {i.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <FormError message={errors.institute_id?.message} />
+        </div>
+      )}
 
       {/* الحلقة */}
       <div>
         <label className="block text-sm text-gray-700 mb-1">الحلقة</label>
         <Popover open={openCircle} onOpenChange={setOpenCircle}>
           <PopoverTrigger asChild>
-            <Button variant="outline" role="combobox" className="w-full justify-between" disabled={!instituteId}>
+            <Button variant="outline" role="combobox" className="w-full justify-between" disabled={!isInstituteAdmin && !instituteId}>
               {circleName}
               <ChevronsUpDown className="opacity-50 size-4" />
             </Button>
@@ -199,10 +216,12 @@ export default function StudentForm({ defaultValues, onSubmit, submitting }: Pro
         <Input label="الحالة (1=نشط, 0=موقوف)" type="number" {...register("status", { valueAsNumber: true })} />
       </div>
 
-      <div className="sm:col-span-2 mt-2 flex gap-2">
-        <Button disabled={!!submitting} type="submit">حفظ</Button>
-        <Button type="button" variant="outline" onClick={() => reset()}>إعادة ضبط</Button>
-      </div>
+      {showActions && (
+        <div className="sm:col-span-2 mt-2 flex gap-2">
+          <Button disabled={!!submitting} type="submit">حفظ</Button>
+          <Button type="button" variant="outline" onClick={() => reset()}>إعادة ضبط</Button>
+        </div>
+      )}
     </form>
   )
 }

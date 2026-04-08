@@ -29,6 +29,19 @@ export default function CircleForm() {
 
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [institutes, setInstitutes] = useState<Array<{ id: number; name: string }>>([])
+
+  useEffect(() => {
+    if (!isSuperAdmin) return
+    ;(async () => {
+      try {
+        const opts = await import("@/services/institutes").then((m) => m.listInstitutesOptions())
+        setInstitutes(opts)
+      } catch {
+        setInstitutes([])
+      }
+    })()
+  }, [isSuperAdmin])
 
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -81,7 +94,7 @@ export default function CircleForm() {
 
     if (isSuperAdmin) {
       if (form.institute_id === "" || Number(form.institute_id) <= 0) {
-        return toast.error("رقم المعهد مطلوب للسوبر أدمن")
+        return toast.error("اختيار المعهد مطلوب")
       }
     }
 
@@ -177,13 +190,20 @@ export default function CircleForm() {
                   </div>
 
                   {isSuperAdmin && (
-                    <Input
-                      label="رقم المعهد (Super Admin فقط)"
-                      type="number"
-                      value={form.institute_id as any}
-                      onChange={(e) => setForm((p) => ({ ...p, institute_id: e.target.value as any }))}
-                      disabled={loading}
-                    />
+                    <div>
+                      <label className="block text-sm mb-1 text-[var(--text)]">المعهد</label>
+                      <select
+                        className="w-full rounded-2xl border px-3 py-2 bg-white text-right"
+                        value={form.institute_id as any}
+                        onChange={(e) => setForm((p) => ({ ...p, institute_id: e.target.value as any }))}
+                        disabled={loading}
+                      >
+                        <option value="">اختر المعهد…</option>
+                        {institutes.map((i) => (
+                          <option key={i.id} value={i.id}>{i.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   )}
 
                   <Input

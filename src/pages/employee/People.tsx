@@ -4,7 +4,7 @@ import Header from "@/components/ui/Header"
 import { DataTable } from "@/components/ui/datatable"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import api from "@/services/api"
+import { employees } from "@/services/api"
 import { toast } from "sonner"
 
 type Person = {
@@ -25,7 +25,7 @@ export default function People() {
     (async () => {
       setLoading(true)
       try {
-        const { data } = await api.get("/employee/people", { params: { per_page: 200 } })
+        const data = await employees.tasksPeople({ per_page: 200 })
         const src: any[] = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
         const mapped = src.map(p => ({
           id: Number(p?.id ?? 0),
