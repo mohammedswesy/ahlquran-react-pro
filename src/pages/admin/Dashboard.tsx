@@ -48,6 +48,10 @@ export default function AdminDashboard() {
   const [attendance, setAttendance] = useState<
     Array<{ date: string; present: number; absent: number; late: number; excused: number }>
   >([])
+  const [subscriptionStatuses, setSubscriptionStatuses] = useState<Array<{ label: string; count: number }>>([])
+  const [globalLogs, setGlobalLogs] = useState<
+    Array<{ id: string | number; action: string; actor: string; created_at: string; level?: "info" | "warning" | "error" }>
+  >([])
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
@@ -56,11 +60,21 @@ export default function AdminDashboard() {
       const res = await fetchDashboard(role)
       // محاولة استخراج البيانات بناءً على هيكلية الـ API المتوقعة
       const s: any = (res as any)?.stats ?? (res as any)?.totals ?? res
-      const r: any[] = (res as any)?.recentInstitutes ?? (res as any)?.recent_institutes ?? []
+      const r: any[] =
+        (res as any)?.recentInstitutes ??
+        (res as any)?.recent_institutes ??
+        []
       const a: any[] = (res as any)?.attendance_week ?? (res as any)?.attendance?.week ?? []
+      const subs: any[] =
+        (res as any)?.subscriptionStatuses ??
+        (res as any)?.subscription_statuses ??
+        []
+      const logs: any[] = (res as any)?.globalLogs ?? (res as any)?.global_logs ?? []
 
       setStats(s || null)
       setRecent(isSuperAdmin && Array.isArray(r) ? r : [])
+      setSubscriptionStatuses(isSuperAdmin && Array.isArray(subs) ? subs : [])
+      setGlobalLogs(isSuperAdmin && Array.isArray(logs) ? logs : [])
       setAttendance(
         Array.isArray(a)
           ? a.map((p: any) => ({
@@ -76,6 +90,8 @@ export default function AdminDashboard() {
       toast.info("سيتم ربط إحصاءات الداشبورد حال تجهيز الـ API")
       setStats(null)
       setRecent([])
+      setSubscriptionStatuses([])
+      setGlobalLogs([])
       setAttendance([])
     } finally {
       setLoading(false)
@@ -201,7 +217,7 @@ export default function AdminDashboard() {
             </Card>
           </Link>
 
-          <Link to="/admin/attendance">
+          <Link to="/admin/attendance/take">
             <Card className="p-6 hover:shadow-lg transition-all cursor-pointer border-2 hover:border-[var(--brand)]">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-xl bg-[var(--brand)] text-white">
@@ -215,7 +231,7 @@ export default function AdminDashboard() {
             </Card>
           </Link>
 
-          <Link to="/admin/Reports">
+          <Link to="/admin/reports">
             <Card className="p-6 hover:shadow-lg transition-all cursor-pointer border-2 hover:border-[var(--brand)]">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-xl bg-[var(--brand)] text-white">
@@ -229,6 +245,53 @@ export default function AdminDashboard() {
             </Card>
           </Link>
         </div>
+
+        {isSuperAdmin && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="font-extrabold text-[var(--text)] text-right">حالات الاشتراكات</CardHeader>
+              <CardContent>
+                {loading ? (
+                  <SkeletonTable rows={4} cols={2} />
+                ) : subscriptionStatuses.length === 0 ? (
+                  <EmptyState title="لا توجد بيانات اشتراكات" desc="ستظهر هنا إحصاءات الباقات والاشتراكات عند توفرها." />
+                ) : (
+                  <div className="space-y-2">
+                    {subscriptionStatuses.map((item, idx) => (
+                      <div key={`${item.label}-${idx}`} className="flex items-center justify-between rounded-xl border px-3 py-2">
+                        <div className="text-sm font-semibold text-[var(--text)]">{item.label}</div>
+                        <div className="text-lg font-black text-[var(--brand)]">{item.count}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="font-extrabold text-[var(--text)] text-right">السجل العام للنظام</CardHeader>
+              <CardContent>
+                {loading ? (
+                  <SkeletonTable rows={4} cols={3} />
+                ) : globalLogs.length === 0 ? (
+                  <EmptyState title="لا توجد سجلات" desc="سيظهر آخر نشاط المنصة في هذه المساحة." />
+                ) : (
+                  <div className="space-y-2">
+                    {globalLogs.map((log) => (
+                      <div key={log.id} className="rounded-xl border px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="font-semibold text-sm text-[var(--text)]">{log.action}</div>
+                          <div className="text-xs text-[var(--muted)]">{log.created_at || "—"}</div>
+                        </div>
+                        <div className="text-xs text-[var(--muted)] mt-1">بواسطة: {log.actor}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* الرسم البياني للحضور */}
         {attendance.length > 0 && (

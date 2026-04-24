@@ -15,14 +15,24 @@ type Props = {
 const LS_COLLAPSED = "qc_sidebar_collapsed"
 const LS_OPEN_SECTIONS = "qc_sidebar_open_sections"
 
-export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal" } }: Props) {
+export default function Sidebar({ brand = { name: "معاهد الخليل لتعليم القرآن الكريم", subtitle: "نظام إدارة الحلقات والاختبارات" } }: Props) {
   const { pathname } = useLocation()
   const nav = useNavigate()
 
   const role = useAuth((s) => s.role) as Role | null
+  const instituteName = useAuth((s) => s.instituteName)
+  const brandName = useAuth((s) => s.brandName)
   const setRole = useAuth((s) => s.setRole)
   const logout = useAuth((s) => s.logout)
   const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false)
+
+  const displayBrandName = instituteName || brandName || brand.name
+  const displayBrandSubtitle =
+    role === "super-admin"
+      ? "مدير النظام"
+      : instituteName
+      ? "بوابة المعهد"
+      : brand.subtitle || (role ? role : "Portal")
 
   const isDev =
     ((import.meta as any)?.env?.DEV ?? false) ||
@@ -103,12 +113,12 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
         dir="rtl"
         className={cn(
           "h-screen sticky top-0 border-l overflow-hidden transition-all duration-300 flex flex-col",
-          "bg-[rgba(254, 254, 254, 0.98)]",
+          "bg-white/40 backdrop-blur-md",
           "text-[var(--text)]"
         )}
         style={{
           width: collapsed ? 80 : 290,
-          boxShadow: "2px 0 12px rgba(0, 0, 0, 0.05)",
+          boxShadow: "2px 0 24px rgba(15, 23, 42, 0.08)",
           borderColor: "var(--border)",
         }}
       >
@@ -125,18 +135,16 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
           }}
           title={brand.name}
         >
-          Q
+          خ
         </div>
 
         {!collapsed && (
           <div className="flex-1 min-w-0 px-3">
             <div className="font-extrabold text-sm leading-tight text-[var(--text)]">
-              {brand.name}
+              {displayBrandName}
             </div>
             <div className="text-xs text-[var(--muted)] truncate">
-              {role === "super-admin"
-                ? "مدير النظام"
-                : brand.subtitle || (role ? role : "Portal")}
+              {displayBrandSubtitle}
             </div>
           </div>
         )}
@@ -170,8 +178,10 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
                     "h-10 shrink-0"
                   )}
                   style={{
-                    background: "rgba(0, 61, 53, 0.05)",
+                    background: "rgba(255,255,255,0.52)",
                     color: "var(--brand)",
+                    border: "1px solid rgba(255,255,255,0.45)",
+                    boxShadow: "0 6px 16px rgba(15,23,42,0.06)",
                   }}
                   title={collapsed ? sec.title || "" : ""}
                 >
@@ -206,10 +216,11 @@ export default function Sidebar({ brand = { name: "AhlQuran", subtitle: "Portal"
                         }
                         style={({ isActive }) => ({
                           background: isActive
-                            ? "linear-gradient(135deg, rgba(0, 61, 53, 0.1), rgba(220, 203, 160, 0.05))"
-                            : "transparent",
+                            ? "linear-gradient(135deg, rgba(16,185,129,0.18), rgba(79,70,229,0.12))"
+                            : "rgba(255,255,255,0.22)",
                           color: isActive ? "var(--brand)" : "var(--muted)",
                           borderLeft: isActive ? "3px solid var(--brand)" : "3px solid transparent",
+                          backdropFilter: "blur(10px)",
                         })}
                         title={collapsed ? item.label : ""}
                         end={false}

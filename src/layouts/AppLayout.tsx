@@ -1,8 +1,21 @@
 import React from "react"
 import Sidebar from "./Sidebar"
 import Header from "@/components/ui/Header"
+import { useAuth } from "@/store/auth"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const role = useAuth((s) => s.role)
+  const instituteName = useAuth((s) => s.instituteName)
+  const brandName = useAuth((s) => s.brandName)
+
+  const title = instituteName || brandName
+  const subtitle =
+    role === "super-admin"
+      ? "Global Control Center"
+      : instituteName
+      ? `لوحة ${instituteName}`
+      : "نظام إدارة حلقات القرآن الكريم الشامل"
+
   return (
     <div dir="rtl" className="min-h-screen" style={{ background: "var(--bg-grad)" }}>
       <div className="flex min-h-screen">
@@ -10,8 +23,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <main className="flex-1 min-w-0 h-screen flex flex-col">
           <Header
-            title="منصة AhlQuran"
-            subtitle="نظام إدارة حلقات القرآن الشاملة"
+            title={title}
+            subtitle={subtitle}
             hideLogout={false}
           />
 

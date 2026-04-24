@@ -48,7 +48,11 @@ export function Badge({ className, variant, size, icon, ...props }: BadgeProps) 
 // Status-specific badge variants
 export const StatusBadge = {
     active: (props?: React.HTMLAttributes<HTMLSpanElement>) => (
-        <Badge variant="success" {...props}>
+        <Badge
+            variant="success"
+            className="border-emerald-200/80 bg-emerald-100/55 text-emerald-700 shadow-[0_0_16px_rgba(16,185,129,0.16)] backdrop-blur-sm"
+            {...props}
+        >
             نشط
         </Badge>
     ),
@@ -58,7 +62,11 @@ export const StatusBadge = {
         </Badge>
     ),
     pending: (props?: React.HTMLAttributes<HTMLSpanElement>) => (
-        <Badge variant="warning" {...props}>
+        <Badge
+            variant="warning"
+            className="border-amber-200/80 bg-amber-100/60 text-amber-700 shadow-[0_0_16px_rgba(245,158,11,0.16)] backdrop-blur-sm"
+            {...props}
+        >
             قيد الانتظار
         </Badge>
     ),

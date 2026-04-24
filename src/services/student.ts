@@ -1,3 +1,5 @@
+export * from "@/services/studentService"
+
 import api from "@/services/api"
 
 export type StudentProgressItem = {

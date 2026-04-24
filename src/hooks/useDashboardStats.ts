@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 
 import api from "@/services/api"
+import { useAuth } from "@/store/auth"
 
 export type EducationSummary = {
   totals: {
@@ -14,6 +15,9 @@ export type EducationSummary = {
     memorizationProgressPercent: number
     evaluationsAveragePercent: number
     staffAttendancePercent: number
+  }
+  context: {
+    instituteName: string | null
   }
   raw: Record<string, any>
 }
@@ -30,6 +34,13 @@ function normalizeSummary(payload: any): EducationSummary {
   const memorization = root?.memorization ?? root?.revision ?? root?.hifz ?? {}
   const evaluations = root?.evaluations ?? root?.assessment ?? root?.assessments ?? root?.exams ?? {}
   const staff = root?.staff ?? root?.employees ?? {}
+
+  const institutes = Array.isArray(root?.institutes) ? root.institutes : []
+  const inferredInstituteName =
+    root?.institute_name ??
+    root?.institute?.name ??
+    institutes[0]?.name ??
+    null
 
   return {
     totals: {
@@ -63,6 +74,9 @@ function normalizeSummary(payload: any): EducationSummary {
           root?.staff_attendance_percentage,
       ),
     },
+    context: {
+      instituteName: inferredInstituteName,
+    },
     raw: root,
   }
 }
@@ -80,10 +94,15 @@ const EMPTY_SUMMARY: EducationSummary = {
     evaluationsAveragePercent: 0,
     staffAttendancePercent: 0,
   },
+  context: {
+    instituteName: null,
+  },
   raw: {},
 }
 
 export default function useDashboardStats() {
+  const role = useAuth((s) => s.role)
+  const authInstituteName = useAuth((s) => s.instituteName)
   const [stats, setStats] = useState<EducationSummary>(EMPTY_SUMMARY)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -93,15 +112,24 @@ export default function useDashboardStats() {
     setError(null)
 
     try {
-      const { data } = await api.get("/reports/education/summary")
-      setStats(normalizeSummary(data))
+      const endpoint = role === "institute-admin" || role === "sub-admin"
+        ? "/dashboard/institute-admin"
+        : "/reports/education/summary"
+      const { data } = await api.get(endpoint)
+      const normalized = normalizeSummary(data)
+      setStats({
+        ...normalized,
+        context: {
+          instituteName: normalized.context.instituteName || authInstituteName || null,
+        },
+      })
     } catch (err: any) {
       setStats(EMPTY_SUMMARY)
       setError(err?.response?.data?.message || "تعذر تحميل ملخص الشؤون التعليمية")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [authInstituteName, role])
 
   useEffect(() => {
     refresh()

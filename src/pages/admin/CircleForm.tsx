@@ -1,19 +1,33 @@
 import React, { useEffect, useState } from "react"
 import AppLayout from "@/layouts/AppLayout"
 import Header from "@/components/ui/Header"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 import { createCircle, getCircle, updateCircle } from "@/services/circles"
 import { useAuth } from "@/store/auth"
 import ScheduleBuilder, { type Schedule } from "@/components/app/ScheduleBuilder"
+import {
+  CIRCLE_TRACK_OPTIONS,
+  getCircleTrackDescription,
+  normalizeCircleTrack,
+  type CircleTrack,
+} from "@/lib/circleTracks"
 
 type FormState = {
   name: string
   type: string
+  track: CircleTrack
   level: number | ""
   schedule: Schedule | null
   institute_id: number | ""
@@ -22,9 +36,11 @@ type FormState = {
 export default function CircleForm() {
   const { id } = useParams()
   const nav = useNavigate()
+  const [searchParams] = useSearchParams()
   const editing = !!id && id !== "new"
 
   const role = useAuth((s) => s.role)
+  const authInstituteId = useAuth((s) => s.instituteId)
   const isSuperAdmin = role === "super-admin"
 
   const [loading, setLoading] = useState(false)
@@ -46,10 +62,30 @@ export default function CircleForm() {
   const [form, setForm] = useState<FormState>({
     name: "",
     type: "hifz",
+    track: "iqra",
     level: "",
     schedule: null,
     institute_id: "",
   })
+
+  useEffect(() => {
+    if (editing) return
+
+    const fromQuery = Number(searchParams.get("institute_id") || "")
+    const queryInstituteId = Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : null
+
+    const fromAuth = Number(authInstituteId)
+    const authResolvedInstituteId = Number.isFinite(fromAuth) && fromAuth > 0 ? fromAuth : null
+
+    const fromStorage = Number(localStorage.getItem("institute_id") || "")
+    const storageInstituteId = Number.isFinite(fromStorage) && fromStorage > 0 ? fromStorage : null
+
+    const resolvedInstituteId = queryInstituteId ?? authResolvedInstituteId ?? storageInstituteId
+
+    if (resolvedInstituteId) {
+      setForm((prev) => ({ ...prev, institute_id: resolvedInstituteId }))
+    }
+  }, [editing, searchParams, authInstituteId])
 
   useEffect(() => {
     if (!editing) return
@@ -75,6 +111,7 @@ export default function CircleForm() {
           setForm({
             name: c.name ?? "",
             type: (c.type ?? "hifz") as any,
+            track: normalizeCircleTrack(c.track) ?? "iqra",
             level: (c.level ?? "") as any,
             schedule: schedule ?? null,
             institute_id: (c.institute_id ?? "") as any,
@@ -124,14 +161,28 @@ export default function CircleForm() {
 
     setSaving(true)
     try {
+      const fromAuth = Number(authInstituteId)
+      const authResolvedInstituteId = Number.isFinite(fromAuth) && fromAuth > 0 ? fromAuth : null
+
+      const fromStorage = Number(localStorage.getItem("institute_id") || "")
+      const storageInstituteId = Number.isFinite(fromStorage) && fromStorage > 0 ? fromStorage : null
+
+      const resolvedInstituteId = isSuperAdmin
+        ? Number(form.institute_id)
+        : authResolvedInstituteId ?? storageInstituteId
+
       const payload: any = {
         name: form.name,
         type: form.type,
+        track: form.track,
         level: form.level === "" ? null : Number(form.level),
         schedule: form.schedule, // نفس شكل JSON اللي كنت تستخدمه
+        institute_id: resolvedInstituteId,
       }
 
-      if (isSuperAdmin) payload.institute_id = Number(form.institute_id)
+      if (!payload.institute_id || Number(payload.institute_id) <= 0) {
+        return toast.error("Institute ID is required")
+      }
 
       if (editing) {
         await updateCircle(Number(id), payload)
@@ -187,6 +238,29 @@ export default function CircleForm() {
                       <option value="tajweed">تجويد</option>
                       <option value="arabic">لغة عربية</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm mb-1 text-[var(--text)]">المسار التعليمي</label>
+                    <Select
+                      value={form.track}
+                      onValueChange={(value) => setForm((p) => ({ ...p, track: value as CircleTrack }))}
+                      disabled={loading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر المسار التعليمي" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CIRCLE_TRACK_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="mt-1 text-xs text-[var(--muted)]">
+                      {getCircleTrackDescription(form.track)}
+                    </div>
                   </div>
 
                   {isSuperAdmin && (

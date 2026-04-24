@@ -1,20 +1,34 @@
 // src/pages/admin/CirclesList.tsx
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import AppLayout from "@/layouts/AppLayout"
 import Header from "@/components/ui/Header"
 import { DataTable } from "@/components/ui/datatable"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Link } from "react-router-dom"
 import { toast } from "sonner"
+import { useInstituteGuard } from "@/hooks/useInstituteGuard"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 import Stat from "@/components/Stat"
-import { StatusBadge } from "@/components/ui/badge"
 import { Users, Target, GraduationCap } from "lucide-react"
 
 import { listCircles, deleteCircle, type Circle } from "@/services/circles"
-
+import {
+  CIRCLE_TRACK_OPTIONS,
+  getCircleTrackColor,
+  getCircleTrackDescription,
+  getCircleTrackName,
+  type CircleTrack,
+} from "@/lib/circleTracks"
+import TenantViewBanner from "@/components/ui/tenant-banner"
 const DAY_AR: Record<string, string> = {
   sat: "السبت",
   sun: "الأحد",
@@ -120,13 +134,21 @@ function ScheduleCell({ schedule }: { schedule: any }) {
 export default function CirclesList() {
   const [rows, setRows] = useState<Circle[]>([])
   const [loading, setLoading] = useState(true)
+  const [filterTrack, setFilterTrack] = useState<string>("all")
+  const [filterInstituteId, setFilterInstituteId] = useState<number | undefined>(undefined)
 
-  const load = async () => {
+  // Lock institute-admin/sub-admin to their own institute
+  const { ownInstituteId } = useInstituteGuard({ filterInstituteId, setFilterInstituteId })
+
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await listCircles({
-        per_page: 1000, // Load all for client-side pagination
-      })
+      const params = {
+        per_page: 1000,
+        ...(filterTrack !== "all" ? { track: filterTrack as CircleTrack } : {}),
+        ...(filterInstituteId != null ? { institute_id: filterInstituteId } : {}),
+      }
+      const res = await listCircles(params)
 
       setRows(res.data)
     } catch (e: any) {
@@ -135,11 +157,11 @@ export default function CirclesList() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterTrack, filterInstituteId])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   const onDelete = async (id: number) => {
     if (!confirm("متأكد من حذف الحلقة؟")) return
@@ -155,7 +177,41 @@ export default function CirclesList() {
   const columns = useMemo<ColumnDef<Circle>[]>(() => [
     { id: "idx", header: "#", cell: ({ row }) => row.index + 1 },
 
-    { accessorKey: "name", header: "اسم الحلقة" },
+    {
+      accessorKey: "name",
+      header: "اسم الحلقة",
+      cell: ({ row }) => (
+        <div className="space-y-1">
+          <div className="font-semibold">{row.original.name}</div>
+          {row.original.track_description && (
+            <div className="text-xs text-[var(--muted)]">{row.original.track_description}</div>
+          )}
+        </div>
+      ),
+    },
+
+    {
+      id: "track",
+      header: "المسار التعليمي",
+      cell: ({ row }) => {
+        const label = row.original.track_name || getCircleTrackName(row.original.track)
+        const description = row.original.track_description || getCircleTrackDescription(row.original.track)
+        const color = getCircleTrackColor(row.original.track)
+
+        return (
+          <Badge
+            title={description}
+            style={{
+              background: color.background,
+              borderColor: color.border,
+              color: color.text,
+            }}
+          >
+            {label}
+          </Badge>
+        )
+      },
+    },
 
     { accessorKey: "type", header: "النوع", cell: ({ getValue }) => (getValue() as any) || "—" },
 
@@ -213,6 +269,11 @@ export default function CirclesList() {
     <AppLayout>
       <Header title="الحلقات" subtitle="إدارة الحلقات" />
 
+      <TenantViewBanner
+        instituteId={filterInstituteId}
+        onClear={() => setFilterInstituteId(undefined)}
+      />
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <Stat
@@ -237,14 +298,38 @@ export default function CirclesList() {
 
       <div dir="rtl" className="space-y-3">
         <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[220px]">
+            <label className="mb-1 block text-sm text-[var(--text)]">تصفية بالمسار</label>
+            <Select value={filterTrack} onValueChange={setFilterTrack}>
+              <SelectTrigger>
+                <SelectValue placeholder="جميع المسارات" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع المسارات</SelectItem>
+                {CIRCLE_TRACK_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <Button variant="outline" onClick={load}>تحديث</Button>
 
-          <Link to="/admin/circles/new">
+          <Link to={filterInstituteId != null ? `/admin/circles/new?institute_id=${filterInstituteId}` : "/admin/circles/new"}>
             <Button>إضافة حلقة</Button>
           </Link>
         </div>
 
-        <DataTable columns={columns} data={rows} isLoading={loading} searchKey="name" />
+        <DataTable
+          columns={columns}
+          data={rows}
+          isLoading={loading}
+          searchKey="name"
+          emptyTitle="لا توجد حلقات في هذا المعهد حالياً"
+          emptyDescription="جرّب تغيير فلتر المسار أو أضف حلقة جديدة."
+        />
       </div>
 
     </AppLayout>

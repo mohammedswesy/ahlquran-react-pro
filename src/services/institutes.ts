@@ -138,6 +138,76 @@ export async function deleteInstitute(id: number) {
 // ========== Options for Selects ==========
 export type InstituteOption = { id: number; name: string }
 
+// ========== Subscription Types ==========
+export type SubscriptionPlan = "free" | "pro" | "enterprise"
+export type SubscriptionStatus = "active" | "expired" | "trial" | "suspended"
+
+export type InstituteSubscription = {
+  id: number
+  institute_id: number
+  institute_name: string
+  plan: SubscriptionPlan
+  status: SubscriptionStatus
+  expiry_date: string | null
+  monthly_fee: number
+  students_count?: number
+  [k: string]: any
+}
+
+export type SubscriptionPayment = {
+  id: number
+  institute_id: number
+  institute_name: string
+  amount: number
+  payment_date: string
+  method: string
+  reference?: string | null
+  notes?: string | null
+}
+
+export type SubscriptionStats = {
+  total_monthly_revenue: number
+  total_active_institutes: number
+  upcoming_renewals: number
+}
+
+export type UpdateSubscriptionPayload = {
+  plan: SubscriptionPlan
+  expiry_date: string | null
+  monthly_fee?: number
+}
+
+export async function listSubscriptions(): Promise<InstituteSubscription[]> {
+  const res = await api.get("/subscriptions")
+  const src = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : []
+  return src as InstituteSubscription[]
+}
+
+export async function getSubscriptionStats(): Promise<SubscriptionStats> {
+  const res = await api.get("/subscriptions/stats")
+  const d = res.data?.data ?? res.data ?? {}
+  return {
+    total_monthly_revenue: Number(d.total_monthly_revenue ?? d.monthly_revenue ?? 0),
+    total_active_institutes: Number(d.total_active_institutes ?? d.active_institutes ?? 0),
+    upcoming_renewals: Number(d.upcoming_renewals ?? d.renewals ?? 0),
+  }
+}
+
+export async function listSubscriptionPayments(): Promise<SubscriptionPayment[]> {
+  const res = await api.get("/subscriptions/payments")
+  const src = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : []
+  return src as SubscriptionPayment[]
+}
+
+export async function updateSubscription(
+  instituteId: number,
+  payload: UpdateSubscriptionPayload
+): Promise<InstituteSubscription> {
+  const res = await api.put(`/institutes/${instituteId}/subscription`, payload)
+  return (res.data?.data ?? res.data) as InstituteSubscription
+}
+
+// ========== Options helper ==========
 /**
  * دالة لإرجاع قائمة مبسطة من المعاهد
  * تستخدم في الـSelect أو الـCombobox

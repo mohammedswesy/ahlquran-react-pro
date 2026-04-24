@@ -1,12 +1,21 @@
 // src/services/circles.ts
 import api from "./api"
 import { normalizeId } from "@/lib/normalize"
+import {
+    getCircleTrackDescription,
+    getCircleTrackName,
+    normalizeCircleTrack,
+    type CircleTrack,
+} from "@/lib/circleTracks"
 
 export type Circle = {
     id: number
     name: string
     institute_id?: number | null
     type?: string | null
+    track?: CircleTrack | null
+    track_name?: string | null
+    track_description?: string | null
     start_time?: string | null
     end_time?: string | null
     schedule?: any
@@ -22,6 +31,7 @@ export type Circle = {
 
 function normalizeCircle(raw: any): Circle {
     const x = normalizeId(raw)
+    const track = normalizeCircleTrack(x.track ?? x.track_key ?? x.educational_track)
 
     let schedule: any = null
 
@@ -39,6 +49,9 @@ function normalizeCircle(raw: any): Circle {
 
     return {
         ...x,
+        track,
+        track_name: x.track_name ?? getCircleTrackName(track),
+        track_description: x.track_description ?? getCircleTrackDescription(track),
         schedule,
     } as Circle
 }
@@ -50,6 +63,7 @@ export type ListCirclesParams = {
     per_page?: number
     institute_id?: number
     type?: string
+    track?: CircleTrack
     search?: string
 }
 export type Paginated<T> = {

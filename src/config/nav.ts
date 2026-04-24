@@ -59,7 +59,8 @@ export const NAV_SECTIONS: NavSection[] = [
         roles: ALL_USERS,
         items: [
             // سوبر أدمن: لوحة النظام العامة
-            { key: "admin_dash", label: "لوحة القيادة", to: "/admin", icon: PiSquaresFourBold, roles: ALL_ADMINS },
+            { key: "super_admin_dash", label: "لوحة القيادة التنفيذية", to: "/admin/dashboard", icon: PiSquaresFourBold, roles: SUPER_ADMIN },
+            { key: "admin_dash", label: "لوحة القيادة", to: "/admin", icon: PiSquaresFourBold, roles: ORG_ADMINS },
            {
                 key: "inst_dash",
                 label: "لوحة مدير المعهد",
@@ -87,9 +88,12 @@ export const NAV_SECTIONS: NavSection[] = [
             { key: "employees", label: "الموظفون", to: "/admin/employees", icon: PiChalkboardTeacherBold, roles: SUPER_ADMIN },
 
             { key: "circles", label: "الحلقات", to: "/admin/circles", icon: PiBookOpenTextBold, roles: ALL_ADMINS },
+            { key: "circles_board", label: "لوحة الحلقات", to: "/admin/circles/board", icon: PiBookOpenTextBold, roles: ALL_ADMINS },
             { key: "students", label: "الطلبة", to: "/admin/students", icon: PiUsersThreeBold, roles: ALL_ADMINS },
             { key: "parents", label: "أولياء الأمور", to: "/admin/parents", icon: PiUsersThreeBold, roles: ALL_ADMINS },
             { key: "teachers", label: "المعلمون", to: "/admin/teachers", icon: PiUsersThreeBold, roles: ALL_ADMINS },
+            { key: "employee_management", label: "إدارة الموظفين", to: "/admin/employee-management", icon: PiChalkboardTeacherBold, roles: ALL_ADMINS },
+            { key: "payroll_management", label: "الرواتب", to: "/admin/payroll-management", icon: PiBriefcaseBold, roles: ALL_ADMINS },
         ],
     },
 
@@ -101,10 +105,13 @@ export const NAV_SECTIONS: NavSection[] = [
         items: [
             // Teacher
             { key: "attendance", label: "الحضور والغياب", to: "/teacher/attendance", icon: PiClipboardTextBold, roles: ["teacher"] },
+            { key: "teacher_circle_mgmt", label: "إدارة الحلقة", to: "/teacher/circle-management", icon: PiClipboardTextBold, roles: ["teacher"] },
             { key: "my_circles", label: "حلقاتي", to: "/teacher/circles", icon: PiBookOpenTextBold, roles: ["teacher"] },
 
             // Student
             { key: "student_schedule", label: "جدولي", to: "/student/schedule", icon: PiBookOpenTextBold, roles: ["student"] },
+            { key: "student_tajweed_library", label: "مكتبة التجويد", to: "/student/tajweed-library", icon: PiBookOpenTextBold, roles: ["student"] },
+            { key: "student_quizzes", label: "الاختبارات", to: "/student/quizzes", icon: PiNotePencilBold, roles: ["student"] },
 
             // Parent
             { key: "parent_children", label: "أبنائي", to: "/parent/children", icon: PiUsersThreeBold, roles: ["parent"] },
@@ -117,10 +124,12 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "إدارة الشؤون",
         roles: ALL_ADMINS,
         items: [
-            { key: "edu_memorization", label: "الحفظ والمراجعة", to: "/dashboard/memorization", icon: PiBookOpenTextBold, roles: ALL_ADMINS },
-            { key: "edu_attendance", label: "الحضور والغياب", to: "/dashboard/attendance", icon: PiClipboardTextBold, roles: ALL_ADMINS },
-            { key: "edu_evaluations", label: "الاختبارات والتقييمات", to: "/dashboard/evaluations", icon: PiNotePencilBold, roles: ALL_ADMINS },
-            { key: "edu_staff", label: "مواظبة الموظفين", to: "/dashboard/staff-monitoring", icon: PiBriefcaseBold, roles: ALL_ADMINS },
+            { key: "edu_memorization", label: "الحفظ والمراجعة", to: "/admin/memorization-reports", icon: PiBookOpenTextBold, roles: ALL_ADMINS },
+            { key: "edu_tajweed_library", label: "مكتبة التجويد", to: "/admin/tajweed-lessons", icon: PiBookOpenTextBold, roles: ALL_ADMINS },
+            { key: "edu_quiz_management", label: "إدارة الاختبارات", to: "/admin/quiz-management", icon: PiNotePencilBold, roles: ALL_ADMINS },
+            { key: "edu_attendance", label: "الحضور والغياب", to: "/admin/attendance/take", icon: PiClipboardTextBold, roles: ALL_ADMINS },
+            { key: "edu_evaluations", label: "الاختبارات والتقييمات", to: "/admin/exam-reports", icon: PiNotePencilBold, roles: ALL_ADMINS },
+            { key: "edu_staff", label: "مواظبة الموظفين", to: "/admin/staff-attendance-reports", icon: PiBriefcaseBold, roles: ALL_ADMINS },
         ],
     },
 

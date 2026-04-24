@@ -21,6 +21,14 @@ export type DashboardStats = {
 export type DashboardResponse = {
     stats: DashboardStats
     recentInstitutes: Institute[]
+    subscriptionStatuses: Array<{ label: string; count: number }>
+    globalLogs: Array<{
+        id: string | number
+        action: string
+        actor: string
+        created_at: string
+        level?: "info" | "warning" | "error"
+    }>
 }
 
 export type AttendancePoint = {
@@ -46,6 +54,12 @@ export async function fetchDashboard(role?: Role | null): Promise<DashboardRespo
 
     const statsSrc = root?.stats ?? root?.totals ?? {}
     const recentSrc = root?.recent_institutes ?? root?.recentInstitutes ?? root?.institutes ?? []
+    const subscriptionSrc =
+        root?.subscription_statuses ??
+        root?.subscriptions?.statuses ??
+        root?.subscriptions ??
+        []
+    const logsSrc = root?.global_logs ?? root?.logs ?? root?.activity ?? []
 
     const mappedStats: DashboardStats = {
         institutes: Number(statsSrc?.institutes ?? statsSrc?.institutes_count ?? 0),
@@ -60,10 +74,33 @@ export async function fetchDashboard(role?: Role | null): Promise<DashboardRespo
     }
 
     const mappedRecent = isInstituteAdmin ? [] : (Array.isArray(recentSrc) ? recentSrc : [])
+    const mappedSubscriptions = !isInstituteAdmin
+        ? (Array.isArray(subscriptionSrc)
+            ? subscriptionSrc.map((item: any, idx: number) => ({
+                label: String(item?.label ?? item?.status ?? `Status ${idx + 1}`),
+                count: Number(item?.count ?? item?.total ?? 0),
+            }))
+            : Object.entries(subscriptionSrc || {}).map(([key, value]) => ({
+                label: String(key),
+                count: Number(value ?? 0),
+            })))
+        : []
+
+    const mappedLogs = !isInstituteAdmin && Array.isArray(logsSrc)
+        ? logsSrc.slice(0, 8).map((item: any, idx: number) => ({
+            id: item?.id ?? idx,
+            action: String(item?.action ?? item?.event ?? item?.description ?? "—"),
+            actor: String(item?.actor ?? item?.user_name ?? item?.user?.name ?? "System"),
+            created_at: String(item?.created_at ?? item?.date ?? ""),
+            level: item?.level,
+        }))
+        : []
 
     return {
         stats: mappedStats,
         recentInstitutes: mappedRecent,
+        subscriptionStatuses: mappedSubscriptions,
+        globalLogs: mappedLogs,
     }
 }
 

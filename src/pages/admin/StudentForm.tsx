@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
+import { useSearchParams } from "react-router-dom"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Input } from "@/components/ui/input"
@@ -24,6 +25,8 @@ const schema = z.object({
   gender: z.enum(["male", "female"]).optional(),
   birthdate: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
+  email: z.string().email("بريد غير صالح").nullable().optional(),
+  password: z.string().min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل").optional().or(z.literal("")),
   institute_id: z.coerce.number().int().min(1, "اختر المعهد").optional(),
   circle_id: z.coerce.number().int().optional(),
   status: z.coerce.number().int().optional().default(1),
@@ -40,10 +43,12 @@ type Props = {
 
 export default function StudentForm({ defaultValues, onSubmit, submitting, formId, showActions = true }: Props) {
   const role = useAuth((s) => s.role)
+  const authInstituteId = useAuth((s) => s.instituteId)
   const isInstituteAdmin = role === "institute-admin"
+  const [searchParams] = useSearchParams()
 
   const {
-    register, handleSubmit, reset, watch, setValue, formState: { errors }
+    register, handleSubmit, reset, watch, setValue, setError, clearErrors, formState: { errors }
   } = useForm<StudentFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -51,6 +56,8 @@ export default function StudentForm({ defaultValues, onSubmit, submitting, formI
       gender: "male",
       birthdate: null,
       phone: null,
+      email: null,
+      password: "",
       institute_id: undefined,
       circle_id: undefined,
       status: 1,
@@ -77,6 +84,24 @@ export default function StudentForm({ defaultValues, onSubmit, submitting, formI
   }, [isInstituteAdmin])
 
   useEffect(() => {
+    if (defaultValues?.id) return
+
+    const fromQuery = Number(searchParams.get("institute_id") || "")
+    const queryInstituteId = Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : null
+
+    const fromAuth = Number(authInstituteId)
+    const authResolvedInstituteId = Number.isFinite(fromAuth) && fromAuth > 0 ? fromAuth : null
+
+    const fromStorage = Number(localStorage.getItem("institute_id") || "")
+    const storageInstituteId = Number.isFinite(fromStorage) && fromStorage > 0 ? fromStorage : null
+
+    const resolvedInstituteId = queryInstituteId ?? authResolvedInstituteId ?? storageInstituteId
+    if (resolvedInstituteId) {
+      setValue("institute_id", resolvedInstituteId)
+    }
+  }, [defaultValues?.id, searchParams, authInstituteId, setValue])
+
+  useEffect(() => {
     if (isInstituteAdmin) {
       ;(async () => {
         const scoped = await listCircles({ per_page: 1000 })
@@ -99,6 +124,8 @@ export default function StudentForm({ defaultValues, onSubmit, submitting, formI
     if (defaultValues) {
       reset({
         ...defaultValues,
+        email: (defaultValues as any).email ?? null,
+        password: "",
         institute_id: defaultValues.institute_id ? Number(defaultValues.institute_id) : undefined,
         circle_id: defaultValues.circle_id ? Number(defaultValues.circle_id) : undefined,
         status: defaultValues.status ?? 1,
@@ -116,7 +143,42 @@ export default function StudentForm({ defaultValues, onSubmit, submitting, formI
   )
 
   return (
-    <form id={formId} onSubmit={handleSubmit(async (v) => { await onSubmit(v) })} className="grid sm:grid-cols-2 gap-3" dir="rtl">
+    <form
+      id={formId}
+      onSubmit={handleSubmit(async (v) => {
+        const isCreateMode = !(defaultValues as any)?.id
+
+        if (isCreateMode && !v.email) {
+          setError("email", { type: "manual", message: "البريد مطلوب" })
+          return
+        }
+
+        if (isCreateMode && !v.password) {
+          setError("password", { type: "manual", message: "كلمة المرور مطلوبة" })
+          return
+        }
+
+        clearErrors(["email", "password"])
+
+        const fromQuery = Number(searchParams.get("institute_id") || "")
+        const queryInstituteId = Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : null
+
+        const fromAuth = Number(authInstituteId)
+        const authResolvedInstituteId = Number.isFinite(fromAuth) && fromAuth > 0 ? fromAuth : null
+
+        const fromStorage = Number(localStorage.getItem("institute_id") || "")
+        const storageInstituteId = Number.isFinite(fromStorage) && fromStorage > 0 ? fromStorage : null
+
+        const fallbackInstituteId = queryInstituteId ?? authResolvedInstituteId ?? storageInstituteId
+
+        await onSubmit({
+          ...v,
+          institute_id: v.institute_id ?? fallbackInstituteId ?? undefined,
+        })
+      })}
+      className="grid sm:grid-cols-2 gap-3"
+      dir="rtl"
+    >
       <div className="sm:col-span-2">
         <Input label="اسم الطالب" error={errors.name?.message} {...register("name")} />
         <FormError message={errors.name?.message} />
@@ -140,6 +202,22 @@ export default function StudentForm({ defaultValues, onSubmit, submitting, formI
 
       <div>
         <Input label="الهاتف" {...register("phone")} />
+      </div>
+
+      <div className="sm:col-span-2 mt-1 rounded-lg border border-[var(--border)] p-3">
+        <div className="text-sm font-semibold text-[var(--text)] mb-2">بيانات الحساب (للدخول للمنصة)</div>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <Input label="البريد الإلكتروني" type="email" error={errors.email?.message} {...register("email")} />
+            <FormError message={errors.email?.message} />
+          </div>
+
+          <div>
+            <Input label="كلمة المرور" type="password" error={errors.password?.message} {...register("password")} />
+            <FormError message={errors.password?.message} />
+          </div>
+        </div>
       </div>
 
       {!isInstituteAdmin && (

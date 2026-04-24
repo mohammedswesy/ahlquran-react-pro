@@ -53,6 +53,13 @@ type ApiErrorPayload = {
 /** Response Interceptor: توحيد الأخطاء + التوست + 401/419 */
 let isHandling401 = false
 
+function isAuthEndpoint(url?: string): boolean {
+  if (!url) return false
+  return ["/auth/login", "/auth/forgot-password", "/auth/register-student"].some((path) =>
+    url.includes(path)
+  )
+}
+
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiErrorPayload>) => {
@@ -65,13 +72,20 @@ api.interceptors.response.use(
     const { status, data } = error.response
     const message = data?.message || "حدث خطأ غير متوقع."
 
+    const requestUrl = error.config?.url
+    const authRequest = isAuthEndpoint(requestUrl)
+
     // 401 أو 419 → جلسة منتهية / توكن منتهي
-    if ((status === 401 || status === 419) && !isHandling401) {
+    // ملاحظة: لا نعمل redirect لطلبات تسجيل الدخول نفسها حتى تظهر رسالة الخطأ داخل شاشة الدخول.
+    if ((status === 401 || status === 419) && !authRequest && !isHandling401) {
       isHandling401 = true
       try {
         toast.error("انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.")
         clearToken()
         localStorage.removeItem("role")
+        localStorage.removeItem("institute_id")
+        localStorage.removeItem("institute_name")
+        localStorage.removeItem("brand_name")
         if (typeof window !== "undefined") {
           window.location.href = "/login"
         }

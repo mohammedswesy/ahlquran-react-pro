@@ -10,10 +10,16 @@ export type Employee = {
     mobile?: string | null
     phone?: string | null 
     job_title?: string | null
+    base_salary?: number | null
+    allowances?: number | null
+    deductions?: number | null
     role?: EmployeeRole | null
     hire_date?: string | null
     institute_id?: number | null
     status?: number | null
+    user_id?: number | null
+    circles?: Array<{ id: number; name: string }> | null
+    circle_ids?: number[] | null
     institute?: { id: number; name: string }
     [k: string]: any
 }
@@ -43,6 +49,14 @@ function normalizeEmployee(raw: any): Employee {
     const x = normalizeId(raw)
     return {
         ...x,
+        base_salary: x.base_salary == null ? null : Number(x.base_salary),
+        allowances: x.allowances == null ? null : Number(x.allowances),
+        deductions: x.deductions == null ? null : Number(x.deductions),
+        user_id: x.user_id == null ? null : Number(x.user_id),
+        circles: Array.isArray(x.circles)
+            ? x.circles.map((circle: any) => ({ id: Number(circle?.id ?? 0), name: String(circle?.name ?? "").trim() })).filter((circle: any) => circle.id > 0 && circle.name)
+            : null,
+        circle_ids: Array.isArray(x.circle_ids) ? x.circle_ids.map(Number).filter(Number.isFinite) : null,
         hire_date: normalizeDate(x.hire_date),
     } as Employee
 }

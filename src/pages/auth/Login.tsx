@@ -5,6 +5,7 @@ import { useAuth, type Role } from "@/store/auth"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { PiLock } from "react-icons/pi"
+import { toast } from "sonner"
 
 export default function Login() {
   const [email, setEmail] = useState("admin@ahlquran.test")
@@ -12,16 +13,20 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const nav = useNavigate()
-  const { setToken, setRole, token, role } = useAuth()
+  const { setAuth, token, role } = useAuth()
+
+  const redirectByRole = (currentRole: Role) => {
+    if (currentRole === "teacher") nav("/teacher/dashboard")
+    else if (currentRole === "parent") nav("/parent")
+    else if (currentRole === "employee") nav("/employee/dashboard")
+    else if (currentRole === "student") nav("/student")
+    else if (currentRole === "institute-admin" || currentRole === "sub-admin") nav("/institute/dashboard")
+    else nav("/admin")
+  }
 
   useEffect(() => {
     if (token && role) {
-      if (role === "teacher") nav("/teacher/dashboard")
-      else if (role === "parent") nav("/parent")
-      else if (role === "employee") nav("/employee/dashboard")
-      else if (role === "student") nav("/student")
-      else if (role === "institute-admin" || role === "sub-admin") nav("/institute/dashboard")
-      else nav("/admin")
+      redirectByRole(role)
     }
   }, [token, role])
 
@@ -31,25 +36,21 @@ export default function Login() {
       setLoading(true)
       setError(null)
 
-      const { token, role } = await login({ email, password })
+      const { token, role, tenant } = await login({ email, password })
       const r = (role as Role) || null
+      const authToken = typeof token === "string" ? token : ""
 
-      if (!r) {
+      if (!authToken || !r) {
         setError("تعذر تحديد صلاحية المستخدم")
         return
       }
 
-      setToken(token)
-      setRole(r)
-
-      if (r === "teacher") nav("/teacher/dashboard")
-      else if (r === "parent") nav("/parent")
-      else if (r === "employee") nav("/employee/dashboard")
-      else if (r === "student") nav("/student")
-      else if (r === "institute-admin" || r === "sub-admin") nav("/institute/dashboard")
-      else nav("/admin")
+      setAuth({ token: authToken, role: r, tenant })
+      redirectByRole(r)
     } catch (e: any) {
-      setError(e?.response?.data?.message || "فشل تسجيل الدخول")
+      const message = e?.response?.data?.message || "فشل تسجيل الدخول"
+      setError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -89,7 +90,7 @@ export default function Login() {
               </div>
 
               <h1 className="text-3xl font-extrabold mb-2 tracking-tight" style={{ color: "var(--text)" }}>
-                منصة Quran Circles
+                معاهد الخليل لتعليم القرآن الكريم
               </h1>
 
               <p className="text-sm" style={{ color: "var(--muted)" }}>
@@ -178,7 +179,7 @@ export default function Login() {
             {/* Footer */}
             <div className="mt-8 pt-6 border-t" style={{ borderColor: "var(--border)" }}>
               <p className="text-xs text-center" style={{ color: "var(--muted)" }}>
-                © 2024 منصة Quran Circles. جميع الحقوق محفوظة.
+                © 2026 معاهد الخليل لتعليم القرآن الكريم. جميع الحقوق محفوظة.
               </p>
             </div>
           </div>

@@ -128,7 +128,7 @@ export default function CircleDetails() {
           )}
 
           {!loadingStudents && students.length === 0 ? (
-            <EmptyState title="لا يوجد طلاب" description="لم يتم العثور على طلاب لهذه الحلقة." />
+            <EmptyState title="لا يوجد طلاب في هذه الحلقة حالياً" description="عند تسجيل طلاب في هذه الحلقة سيظهرون هنا." />
           ) : (
             <DataTable data={students} columns={columns} isLoading={loadingStudents} />
           )}

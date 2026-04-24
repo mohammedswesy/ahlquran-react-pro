@@ -1,5 +1,5 @@
 export const BRAND = {
-  appName: "Quran Circles Platform",
-  appNameAr: "منصة الحلقات التعليمية",
-  shortName: "QC",
+  appName: "معاهد الخليل لتعليم القرآن الكريم",
+  appNameAr: "معاهد الخليل لتعليم القرآن الكريم",
+  shortName: "الخليل",
 }

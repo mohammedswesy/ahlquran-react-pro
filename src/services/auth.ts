@@ -1,6 +1,6 @@
 // src/services/auth.ts
 import api from "./api"
-import { resolveRoleFromUser } from "@/store/auth"
+import { resolveRoleFromUser, resolveTenantContextFromUser } from "@/store/auth"
 
 export type LoginPayload = { email: string; password: string }
 
@@ -8,12 +8,13 @@ export async function login(payload: LoginPayload) {
     const res = await api.post("/auth/login", payload)
     const { token, role, user } = res.data
     const resolvedRole = resolveRoleFromUser(user, role)
+    const tenant = resolveTenantContextFromUser(user, {
+        instituteId: res.data?.institute_id,
+        instituteName: res.data?.institute_name,
+        brandName: res.data?.brand_name,
+    })
 
-   
-    localStorage.setItem("token", token)
-    if (resolvedRole) localStorage.setItem("role", resolvedRole)
-
-    return { token, role: resolvedRole, user }
+    return { token, role: resolvedRole, user, tenant }
 }
 
 export async function me() {
@@ -24,6 +25,9 @@ export async function me() {
 export function logout() {
     localStorage.removeItem("token")
     localStorage.removeItem("role")
+    localStorage.removeItem("institute_id")
+    localStorage.removeItem("institute_name")
+    localStorage.removeItem("brand_name")
 }
 
 export async function requestPasswordReset(email: string) {

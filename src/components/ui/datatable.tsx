@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { PiCaretUpBold, PiCaretDownBold } from "react-icons/pi"
+import { cn } from "@/lib/utils"
 
 /** ✅ الشكل القديم اللي عندك */
 export type SimpleColumn<T> = {
@@ -35,6 +36,17 @@ type Props<T> = {
     searchPlaceholder?: string
     pageSizeOptions?: number[]
     defaultPageSize?: number
+    /** Customise the "no rows" state inside the table */
+    emptyTitle?: string
+    emptyDescription?: string
+    hideToolbar?: boolean
+    rowClassName?: string | ((row: T, index: number) => string)
+    tableWrapperClassName?: string
+    tableClassName?: string
+    toolbarClassName?: string
+    headClassName?: string
+    paginationClassName?: string
+    cellClassName?: string
 }
 
 function isColumnDefArray<T>(cols: AnyColumns<T>): cols is ColumnDef<T, any>[] {
@@ -78,6 +90,16 @@ export function DataTable<T>({
     searchPlaceholder = "بحث…",
     pageSizeOptions = [5, 10, 20, 50],
     defaultPageSize = 10,
+    emptyTitle = "لا توجد بيانات في الوقت الحالي",
+    emptyDescription = "جرّب تغيير معايير البحث أو إضافة عنصر جديد.",
+    hideToolbar = false,
+    rowClassName,
+    tableWrapperClassName,
+    tableClassName,
+    toolbarClassName,
+    headClassName,
+    paginationClassName,
+    cellClassName,
 }: Props<T>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -149,78 +171,80 @@ export function DataTable<T>({
     const hasRows = table.getRowModel().rows.length > 0
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-3">
             {/* Toolbar */}
-            <div
-                className="rounded-lg p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between border"
-                style={{
-                    background: "var(--surface)",
-                    borderColor: "var(--border)",
-                    boxShadow: "var(--shadow2)",
-                }}
-            >
-                <div className="flex-1 min-w-0">
-                    <Input
-                        value={globalSearch}
-                        onChange={(e) => setGlobalSearch(e.target.value)}
-                        placeholder={searchPlaceholder}
-                        disabled={!safeSearchKey}
-                    />
-                    <div className="text-xs mt-2" style={{ color: "var(--muted)" }}>
-                        البحث على: <span className="font-medium" style={{ color: "var(--text)" }}>{safeSearchKey || "—"}</span>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                    <div className="text-sm font-medium" style={{ color: "var(--text)" }}>
-                        العدد:
+            {!hideToolbar && (
+                <div
+                    className={cn(
+                        "rounded-xl p-5 flex flex-col md:flex-row gap-4 md:items-center md:justify-between border bg-white",
+                        toolbarClassName,
+                    )}
+                    style={{
+                        borderColor: "#e2e8f0",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.03)"
+                    }}
+                >
+                    <div className="flex-1 min-w-0">
+                        <Input
+                            value={globalSearch}
+                            onChange={(e) => setGlobalSearch(e.target.value)}
+                            placeholder={searchPlaceholder}
+                            disabled={!safeSearchKey}
+                        />
+                        <div className="text-xs mt-2" style={{ color: "var(--muted)" }}>
+                            البحث على: <span className="font-medium" style={{ color: "var(--text)" }}>{safeSearchKey || "—"}</span>
+                        </div>
                     </div>
 
-                    <select
-                        className="px-3 py-2 rounded-lg text-sm border transition-all"
-                        style={{
-                            background: "var(--surface)",
-                            borderColor: "var(--border)",
-                            color: "var(--text)",
-                        }}
-                        value={table.getState().pagination.pageSize}
-                        onChange={(e) => table.setPageSize(Number(e.target.value))}
-                    >
-                        {pageSizeOptions.map((n) => (
-                            <option key={n} value={n}>
-                                {n}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <div className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                            العدد:
+                        </div>
 
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                            setGlobalSearch("")
-                            table.resetColumnFilters()
-                            table.resetSorting()
-                        }}
-                    >
-                        تصفير
-                    </Button>
+                        <select
+                            className="px-3 py-2 rounded-lg text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            style={{
+                                borderColor: "#e2e8f0",
+                                color: "var(--text)",
+                            }}
+                            value={table.getState().pagination.pageSize}
+                            onChange={(e) => table.setPageSize(Number(e.target.value))}
+                        >
+                            {pageSizeOptions.map((n) => (
+                                <option key={n} value={n}>
+                                    {n}
+                                </option>
+                            ))}
+                        </select>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setGlobalSearch("")
+                                table.resetColumnFilters()
+                                table.resetSorting()
+                            }}
+                        >
+                            تصفير
+                        </Button>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Table */}
             <div
-                className="w-full rounded-lg overflow-x-auto border"
+                className={cn("w-full rounded-lg overflow-x-auto border bg-white", tableWrapperClassName)}
                 style={{
-                    background: "var(--surface)",
-                    borderColor: "var(--border)",
-                    boxShadow: "var(--shadow2)",
+                    borderColor: "#e2e8f0",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.03)"
                 }}
             >
-                <table className="w-full text-sm">
+                <table className={cn("w-full text-sm", tableClassName)}>
                     <thead
+                        className={cn("bg-gradient-to-r from-slate-50 to-white border-b", headClassName)}
                         style={{
-                            background: "var(--surface2)",
-                            borderBottom: "1px solid var(--border)",
+                            borderColor: "#e2e8f0",
                         }}
                     >
                         {table.getHeaderGroups().map((hg) => (
@@ -270,24 +294,28 @@ export function DataTable<T>({
                             <tr>
                                 <td colSpan={columnsNormalized.length} className="p-12 text-center">
                                     <div className="text-base font-semibold" style={{ color: "var(--text)" }}>
-                                        لا توجد بيانات
+                                        {emptyTitle}
                                     </div>
                                     <div className="text-sm mt-2" style={{ color: "var(--muted)" }}>
-                                        جرّب تغيير معايير البحث أو إضافة عناصر جديدة.
+                                        {emptyDescription}
                                     </div>
                                 </td>
                             </tr>
                         ) : (
-                            table.getRowModel().rows.map((row) => (
+                            table.getRowModel().rows.map((row, idx) => (
                                 <tr
                                     key={row.id}
-                                    className="transition-colors border-t hover:bg-[var(--surface2)]"
+                                    className={cn(
+                                        "transition-colors border-t hover:bg-slate-100",
+                                        idx % 2 === 0 ? "bg-slate-50/50" : "bg-white",
+                                        typeof rowClassName === "function" ? rowClassName(row.original, idx) : rowClassName,
+                                    )}
                                     style={{ borderColor: "var(--border)" }}
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <td
                                             key={cell.id}
-                                            className="px-6 py-4"
+                                            className={cn("px-6 py-4", cellClassName)}
                                             style={{ color: "var(--text)" }}
                                         >
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -302,11 +330,13 @@ export function DataTable<T>({
 
             {/* Pagination */}
             <div
-                className="rounded-lg p-4 flex flex-col md:flex-row gap-4 md:items-center md:justify-between border"
+                className={cn(
+                    "rounded-xl p-5 flex flex-col md:flex-row gap-4 md:items-center md:justify-between border bg-white",
+                    paginationClassName,
+                )}
                 style={{
-                    background: "var(--surface)",
-                    borderColor: "var(--border)",
-                    boxShadow: "var(--shadow2)",
+                    borderColor: "#e2e8f0",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.03)"
                 }}
             >
                 <div className="text-sm font-medium" style={{ color: "var(--text)" }}>

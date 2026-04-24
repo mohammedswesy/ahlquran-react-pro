@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import AppLayout from "@/layouts/AppLayout"
 import Header from "@/components/ui/Header"
@@ -27,10 +27,50 @@ import {
 } from "react-icons/pi"
 
 import useDashboardStats from "@/hooks/useDashboardStats"
+import { useAuth } from "@/store/auth"
+import api from "@/services/api"
+
+type DashboardCardStats = {
+    teachers_count: number
+    students_count: number
+    active_circles_count: number
+}
 
 export default function InstituteAdminDashboardPage() {
     const nav = useNavigate()
     const { stats, loading, error, refresh } = useDashboardStats()
+    const [cardStats, setCardStats] = useState<DashboardCardStats>({
+        teachers_count: 0,
+        students_count: 0,
+        active_circles_count: 0,
+    })
+    const fallbackInstituteName = useAuth((s) => s.instituteName)
+    const instituteName = stats.context.instituteName || fallbackInstituteName || "المعهد"
+
+    const loadCardStats = async () => {
+        try {
+            const { data } = await api.get("/dashboard/stats")
+            const root = data?.data ?? data ?? {}
+            setCardStats({
+                teachers_count: Number(root?.teachers_count ?? root?.teachers ?? 0),
+                students_count: Number(root?.students_count ?? root?.students ?? 0),
+                active_circles_count: Number(root?.active_circles_count ?? root?.circles ?? 0),
+            })
+        } catch {
+            // fallback to existing dashboard hook values when dedicated stats endpoint fails
+            setCardStats((prev) => ({
+                ...prev,
+                teachers_count: Number(stats.totals.teachers ?? 0),
+                students_count: Number(stats.totals.students ?? 0),
+                active_circles_count: Number(stats.totals.circles ?? 0),
+            }))
+        }
+    }
+
+    useEffect(() => {
+        loadCardStats()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     useEffect(() => {
         if (error) {
@@ -38,34 +78,41 @@ export default function InstituteAdminDashboardPage() {
         }
     }, [error])
 
+    useEffect(() => {
+        if (!loading) {
+            setCardStats((prev) => ({
+                teachers_count: prev.teachers_count || Number(stats.totals.teachers ?? 0),
+                students_count: prev.students_count || Number(stats.totals.students ?? 0),
+                active_circles_count: prev.active_circles_count || Number(stats.totals.circles ?? 0),
+            }))
+        }
+    }, [loading, stats])
+
     const kpis = useMemo(
         () => [
             {
-                label: "إجمالي الطلاب",
-                value: stats.totals.students,
-                icon: Users,
-                tone: "emerald",
-            },
-            {
                 label: "إجمالي المعلمين",
-                value: stats.totals.teachers,
+                value: cardStats.teachers_count,
                 icon: GraduationCap,
                 tone: "sand",
+                to: "/admin/teachers",
             },
             {
-                label: "إجمالي الحلقات",
-                value: stats.totals.circles,
+                label: "إجمالي الطلاب",
+                value: cardStats.students_count,
+                icon: Users,
+                tone: "emerald",
+                to: "/admin/students",
+            },
+            {
+                label: "الحلقات النشطة",
+                value: cardStats.active_circles_count,
                 icon: Layers3,
                 tone: "emerald",
-            },
-            {
-                label: "إجمالي أولياء الأمور",
-                value: stats.totals.parents,
-                icon: UserRoundCheck,
-                tone: "sand",
+                to: "/admin/circles",
             },
         ],
-        [stats],
+        [cardStats],
     )
 
     const modules = useMemo(
@@ -75,7 +122,7 @@ export default function InstituteAdminDashboardPage() {
                 subtitle: "مستوى الإنجاز العام في برامج الحفظ والمراجعة",
                 stat: `${Math.round(stats.modules.memorizationProgressPercent)}% إنجاز` ,
                 icon: BookOpenCheck,
-                to: "/dashboard/memorization",
+                to: "/admin/memorization-reports",
                 accent: "emerald",
             },
             {
@@ -83,7 +130,7 @@ export default function InstituteAdminDashboardPage() {
                 subtitle: "نسبة حضور اليوم على مستوى المعهد",
                 stat: `${Math.round(stats.modules.attendanceTodayPercent)}% حضور اليوم`,
                 icon: CalendarCheck2,
-                to: "/dashboard/attendance",
+                to: "/admin/attendance-reports",
                 accent: "sand",
             },
             {
@@ -91,7 +138,7 @@ export default function InstituteAdminDashboardPage() {
                 subtitle: "متوسط نتائج التقييمات والاختبارات",
                 stat: `${Math.round(stats.modules.evaluationsAveragePercent)}% متوسط الأداء`,
                 icon: ClipboardCheck,
-                to: "/dashboard/evaluations",
+                to: "/admin/exam-reports",
                 accent: "emerald",
             },
             {
@@ -99,7 +146,7 @@ export default function InstituteAdminDashboardPage() {
                 subtitle: "مؤشر التزام الفريق الإداري والموظفين",
                 stat: `${Math.round(stats.modules.staffAttendancePercent)}% التزام الموظفين`,
                 icon: ShieldCheck,
-                to: "/dashboard/staff-monitoring",
+                to: "/admin/staff-attendance-reports",
                 accent: "sand",
             },
         ],
@@ -109,7 +156,8 @@ export default function InstituteAdminDashboardPage() {
     const quickLinks = useMemo(
         () => [
             { label: "إدارة المعلمين", to: "/admin/teachers", icon: PiUsersThreeBold },
-            { label: "سجل الحضور", to: "/admin/attendance", icon: PiClipboardTextBold },
+            { label: "إضافة موظف", to: "/admin/employees?create=1", icon: PiUsersThreeBold },
+            { label: "سجل الحضور", to: "/admin/attendance/take", icon: PiClipboardTextBold },
             { label: "التقارير الشاملة", to: "/admin/reports", icon: PiNotePencilBold },
         ],
         [],
@@ -134,7 +182,7 @@ export default function InstituteAdminDashboardPage() {
 
     return (
         <AppLayout>
-            <Header title="لوحة الشؤون التعليمية" subtitle="متابعة فورية للأداء التعليمي والانضباط اليومي" />
+            <Header title={`لوحة ${instituteName}`} subtitle="إحصاءات المعهد وأدوات فريقك التعليمية" />
 
             <div className="p-4 sm:p-5 space-y-5" dir="rtl">
                 <LoadingBar active={loading} />
@@ -156,7 +204,7 @@ export default function InstituteAdminDashboardPage() {
                                 ملخص يومي مباشر من النظام التعليمي
                             </div>
                             <div>
-                                <h1 className="text-2xl font-black tracking-tight sm:text-3xl">إدارة الشؤون التعليمية</h1>
+                                <h1 className="text-2xl font-black tracking-tight sm:text-3xl">إدارة الشؤون التعليمية - {instituteName}</h1>
                                 <p className="mt-2 max-w-2xl text-sm leading-7 text-emerald-50/90 sm:text-base">
                                     متابعة موحّدة للحضور، الحفظ والمراجعة، الاختبارات، وانضباط فريق العمل من لوحة واحدة سريعة.
                                 </p>
@@ -166,7 +214,10 @@ export default function InstituteAdminDashboardPage() {
                         <div className="flex flex-wrap gap-2">
                             <Button
                                 size="sm"
-                                onClick={refresh}
+                                onClick={async () => {
+                                    await refresh()
+                                    await loadCardStats()
+                                }}
                                 className="gap-2 border-0 bg-white text-emerald-900 hover:bg-white/90"
                             >
                                 <PiArrowClockwiseBold />
@@ -184,7 +235,7 @@ export default function InstituteAdminDashboardPage() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {loading
-                        ? [1, 2, 3, 4].map((item) => (
+                        ? [1, 2, 3].map((item) => (
                             <Card key={item} className="overflow-hidden border-0 shadow-sm">
                                 <CardContent className="space-y-4 pt-6">
                                     <div className="flex items-center justify-between">
@@ -201,28 +252,34 @@ export default function InstituteAdminDashboardPage() {
                             const Icon = item.icon
 
                             return (
-                                <Card
+                                <button
                                     key={item.label}
-                                    className="overflow-hidden rounded-3xl border shadow-sm"
-                                    style={{
-                                        borderColor: tone.border,
-                                        background: tone.background,
-                                    }}
+                                    type="button"
+                                    onClick={() => nav(item.to)}
+                                    className="text-right"
                                 >
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div>
-                                                <div className="text-sm font-semibold" style={{ color: tone.text }}>{item.label}</div>
-                                                <div className="mt-3 text-3xl font-black tracking-tight" style={{ color: tone.text }}>
-                                                    {item.value.toLocaleString("ar-SA")}
+                                    <Card
+                                        className="overflow-hidden rounded-3xl border shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer"
+                                        style={{
+                                            borderColor: tone.border,
+                                            background: tone.background,
+                                        }}
+                                    >
+                                        <CardContent className="pt-6">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <div className="text-sm font-semibold" style={{ color: tone.text }}>{item.label}</div>
+                                                    <div className="mt-3 text-3xl font-black tracking-tight" style={{ color: tone.text }}>
+                                                        {Number(item.value || 0).toLocaleString("ar-SA")}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-2xl p-3" style={{ background: tone.badge, color: tone.icon }}>
+                                                    <Icon className="h-6 w-6" />
                                                 </div>
                                             </div>
-                                            <div className="rounded-2xl p-3" style={{ background: tone.badge, color: tone.icon }}>
-                                                <Icon className="h-6 w-6" />
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                        </CardContent>
+                                    </Card>
+                                </button>
                             )
                         })}
                 </div>
@@ -252,11 +309,10 @@ export default function InstituteAdminDashboardPage() {
                                 const tone = cardTone(module.accent as "emerald" | "sand")
 
                                 return (
-                                    <button
+                                    <Link
                                         key={module.title}
-                                        type="button"
-                                        onClick={() => nav(module.to)}
-                                        className="text-right"
+                                        to={module.to}
+                                        className="block text-right"
                                     >
                                         <Card
                                             className="group h-full rounded-3xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-xl"
@@ -284,7 +340,7 @@ export default function InstituteAdminDashboardPage() {
                                                 </div>
                                             </CardContent>
                                         </Card>
-                                    </button>
+                                    </Link>
                                 )
                             })}
                     </div>

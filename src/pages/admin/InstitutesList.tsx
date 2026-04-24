@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { ColumnDef } from "@tanstack/react-table"
 import { toast } from "sonner"
+import { useSearchParams } from "react-router-dom"
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { DataTable } from "@/components/ui/datatable"
@@ -29,6 +30,7 @@ import { listOrganizations } from "@/services/organizations"
 import InstituteForm, { type InstituteFormValues } from "./InstituteForm"
 
 export default function InstitutesList() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Institute[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -49,7 +51,7 @@ export default function InstitutesList() {
   const [orgMap, setOrgMap] = useState<Map<number, string>>(new Map())
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const [countries, cities, orgs] = await Promise.all([
           fetchCountries(),
@@ -64,6 +66,14 @@ export default function InstitutesList() {
       }
     })()
   }, [])
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return
+    setOpenCreate(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete("create")
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const columns = useMemo<ColumnDef<Institute>[]>(() => [
     { id: "serial", header: "#", cell: ({ row }) => row.index + 1 },
@@ -224,7 +234,7 @@ export default function InstitutesList() {
             />
             <div className="ms-auto flex items-center gap-2">
               <ExportMenu rows={rows} filename="institutes" />
-              <Button onClick={load} variant="outline">
+              <Button onClick={() => load()} variant="outline">
                 تحديث
               </Button>
               <Button onClick={() => setOpenCreate(true)}>إضافة معهد</Button>

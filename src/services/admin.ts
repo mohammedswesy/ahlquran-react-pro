@@ -86,6 +86,162 @@ export type AttendanceOverview = {
     circles: CircleStatusItem[]
 }
 
+export type AdminOverviewStat = {
+    total_students: number
+    new_students_last_30_days: number
+    active_teachers: number
+    base_salary_sum: number
+    monthly_base_salaries: number
+    pending_payouts: number
+    attendance_today_percentage: number
+    monthly_registrations: Array<{ month: string; value: number }>
+    level_distribution: Array<{ level: string; count: number }>
+    payroll_list: Array<{
+        id: number | string
+        employee_name: string
+        base_salary: number
+        allowances: number
+        deductions: number
+        net_salary: number
+        status: string
+    }>
+    critical_alerts: Array<{ id: number | string; student_name: string; absences_count: number; circle_name?: string | null }>
+    recent_activity: Array<{ id: number | string; action: string; created_at?: string | null }>
+}
+
+function toNumber(value: any): number {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+}
+
+function normalizeMonthlyRegistrations(src: any): Array<{ month: string; value: number }> {
+    if (!Array.isArray(src)) return []
+
+    return src
+        .map((item: any) => ({
+            month: String(item?.month ?? item?.label ?? item?.name ?? ""),
+            value: toNumber(item?.value ?? item?.count ?? item?.students ?? item?.registrations),
+        }))
+        .filter((item: any) => item.month)
+}
+
+function normalizeLevelDistribution(src: any): Array<{ level: string; count: number }> {
+    if (!Array.isArray(src)) return []
+
+    return src
+        .map((item: any) => ({
+            level: String(item?.level ?? item?.name ?? item?.label ?? "غير محدد"),
+            count: toNumber(item?.count ?? item?.value ?? item?.students),
+        }))
+        .filter((item: any) => item.level)
+}
+
+function normalizeCriticalAlerts(src: any): Array<{ id: number | string; student_name: string; absences_count: number; circle_name?: string | null }> {
+    if (!Array.isArray(src)) return []
+
+    return src
+        .map((item: any, index: number) => ({
+            id: item?.id ?? item?.student_id ?? `alert-${index}`,
+            student_name: String(item?.student_name ?? item?.name ?? item?.student?.name ?? "").trim(),
+            absences_count: toNumber(item?.absences_count ?? item?.consecutive_absences ?? item?.count ?? 0),
+            circle_name: item?.circle_name ?? item?.circle?.name ?? null,
+        }))
+        .filter((item: any) => item.student_name && item.absences_count > 0)
+}
+
+function normalizeActivity(src: any): Array<{ id: number | string; action: string; created_at?: string | null }> {
+    if (!Array.isArray(src)) return []
+
+    return src
+        .map((item: any, index: number) => ({
+            id: item?.id ?? `activity-${index}`,
+            action: String(item?.action ?? item?.title ?? item?.message ?? "").trim(),
+            created_at: item?.created_at ?? item?.date ?? null,
+        }))
+        .filter((item: any) => item.action)
+}
+
+function normalizePayrollList(src: any): Array<{
+    id: number | string
+    employee_name: string
+    base_salary: number
+    allowances: number
+    deductions: number
+    net_salary: number
+    status: string
+}> {
+    const rows = Array.isArray(src)
+        ? src
+        : Array.isArray(src?.data)
+            ? src.data
+            : Array.isArray(src?.rows)
+                ? src.rows
+                : Array.isArray(src?.payroll)
+                    ? src.payroll
+                    : []
+
+    return rows
+        .map((item: any, index: number) => {
+            const base = toNumber(item?.base_salary ?? item?.base ?? item?.salary)
+            const allowances = toNumber(item?.allowances ?? item?.bonus ?? item?.extra)
+            const deductions = toNumber(item?.deductions ?? item?.discount ?? item?.penalties)
+            const net = toNumber(item?.net_salary ?? item?.net ?? base + allowances - deductions)
+
+            return {
+                id: item?.id ?? item?.employee_id ?? `payroll-${index}`,
+                employee_name: String(item?.employee_name ?? item?.employee?.name ?? item?.name ?? "").trim(),
+                base_salary: base,
+                allowances,
+                deductions,
+                net_salary: net,
+                status: String(item?.status ?? "pending"),
+            }
+        })
+        .filter((row: any) => row.employee_name)
+}
+
+export async function getAdminStatsOverview(): Promise<AdminOverviewStat> {
+    const root = await getFirst([
+        "/admin/stats/overview",
+        "/dashboard/admin/stats-overview",
+        "/admin/dashboard/overview",
+    ])
+    const payrollSummaryRoot = await getFirst(["/admin/payroll"])
+    const payrollDetailsRoot = await getFirst(["/employees/payroll"])
+
+    const overview = root?.overview ?? root?.stats ?? root
+    const payrollSummary = payrollSummaryRoot?.stats ?? payrollSummaryRoot?.overview ?? payrollSummaryRoot
+    const payrollRows = normalizePayrollList(payrollDetailsRoot)
+
+    const baseSalarySum = toNumber(
+        payrollSummary?.base_salary_sum ??
+        payrollSummary?.monthly_base_salaries ??
+        overview?.base_salary_sum ??
+        overview?.monthly_base_salaries,
+    )
+
+    const pendingPayouts = toNumber(
+        payrollSummary?.pending_payouts ??
+        payrollSummary?.pending_sum ??
+        overview?.pending_payouts,
+    )
+
+    return {
+        total_students: toNumber(overview?.total_students ?? overview?.students ?? overview?.students_count),
+        new_students_last_30_days: toNumber(overview?.new_students_last_30_days ?? overview?.students_new_last_30_days ?? overview?.new_students),
+        active_teachers: toNumber(overview?.active_teachers ?? overview?.teachers_active ?? overview?.teachers),
+        base_salary_sum: baseSalarySum,
+        monthly_base_salaries: baseSalarySum,
+        pending_payouts: pendingPayouts,
+        attendance_today_percentage: toNumber(overview?.attendance_today_percentage ?? overview?.attendance_rate ?? overview?.attendance_today),
+        monthly_registrations: normalizeMonthlyRegistrations(overview?.monthly_registrations ?? overview?.registrations_monthly ?? overview?.registrations),
+        level_distribution: normalizeLevelDistribution(overview?.level_distribution ?? overview?.students_by_level ?? overview?.levels),
+        payroll_list: payrollRows,
+        critical_alerts: normalizeCriticalAlerts(overview?.critical_alerts ?? overview?.alerts ?? overview?.students_alerts),
+        recent_activity: normalizeActivity(overview?.recent_activity ?? overview?.activity_logs ?? overview?.logs),
+    }
+}
+
 async function getFirst(urls: string[]) {
     for (const url of urls) {
         try {

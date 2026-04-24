@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
+import { useSearchParams } from "react-router-dom"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Input } from "@/components/ui/input"
@@ -43,7 +44,9 @@ type Props = {
 
 export default function TeacherForm({ defaultValues, onSubmit, submitting, formId, showActions = true, serverErrors = {} }: Props) {
     const role = useAuth((s) => s.role)
+    const authInstituteId = useAuth((s) => s.instituteId)
     const isInstituteAdmin = role === "institute-admin"
+    const [searchParams] = useSearchParams()
 
     const { register, handleSubmit, reset, setValue, watch, formState: { errors } } =
         useForm<TeacherFormValues>({
@@ -72,6 +75,24 @@ export default function TeacherForm({ defaultValues, onSubmit, submitting, formI
         if (isInstituteAdmin) return
         ; (async () => setInstitutes(await listInstitutesOptions()))()
     }, [isInstituteAdmin])
+
+    useEffect(() => {
+        if (defaultValues?.id) return
+
+        const fromQuery = Number(searchParams.get("institute_id") || "")
+        const queryInstituteId = Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : null
+
+        const fromAuth = Number(authInstituteId)
+        const authResolvedInstituteId = Number.isFinite(fromAuth) && fromAuth > 0 ? fromAuth : null
+
+        const fromStorage = Number(localStorage.getItem("institute_id") || "")
+        const storageInstituteId = Number.isFinite(fromStorage) && fromStorage > 0 ? fromStorage : null
+
+        const resolvedInstituteId = queryInstituteId ?? authResolvedInstituteId ?? storageInstituteId
+        if (resolvedInstituteId) {
+            setValue("institute_id", resolvedInstituteId)
+        }
+    }, [defaultValues?.id, searchParams, authInstituteId, setValue])
 
     useEffect(() => {
         if (isInstituteAdmin) {
@@ -104,7 +125,27 @@ export default function TeacherForm({ defaultValues, onSubmit, submitting, formI
     )
 
     return (
-        <form id={formId} onSubmit={handleSubmit(async v => { await onSubmit(v) })} className="grid sm:grid-cols-2 gap-3" dir="rtl">
+        <form
+            id={formId}
+            onSubmit={handleSubmit(async (v) => {
+                const fromQuery = Number(searchParams.get("institute_id") || "")
+                const queryInstituteId = Number.isFinite(fromQuery) && fromQuery > 0 ? fromQuery : null
+
+                const fromAuth = Number(authInstituteId)
+                const authResolvedInstituteId = Number.isFinite(fromAuth) && fromAuth > 0 ? fromAuth : null
+
+                const fromStorage = Number(localStorage.getItem("institute_id") || "")
+                const storageInstituteId = Number.isFinite(fromStorage) && fromStorage > 0 ? fromStorage : null
+
+                const fallbackInstituteId = queryInstituteId ?? authResolvedInstituteId ?? storageInstituteId
+                await onSubmit({
+                    ...v,
+                    institute_id: v.institute_id ?? fallbackInstituteId ?? undefined,
+                })
+            })}
+            className="grid sm:grid-cols-2 gap-3"
+            dir="rtl"
+        >
             <div className="sm:col-span-2">
                 <Input label="اسم المعلّم" error={errors.name?.message} {...register("name")} />
                 <FormError message={errors.name?.message} />

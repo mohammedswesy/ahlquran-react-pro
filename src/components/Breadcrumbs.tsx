@@ -4,6 +4,7 @@ import { FaAngleLeft } from 'react-icons/fa'
 const LABELS: Record<string, string> = {
     // جذور
     '/admin': 'لوحة الإدارة',
+    '/admin/dashboard': 'لوحة القيادة التنفيذية',
     '/teacher': 'لوحة المعلّم',
     '/teacher/dashboard': 'لوحة المعلّم',
     '/student': 'لوحة الطالب',
@@ -12,13 +13,23 @@ const LABELS: Record<string, string> = {
     '/employee/dashboard': 'لوحة الموظّف',
     '/institute/dashboard': 'لوحة الشؤون التعليمية',
     '/dashboard/memorization': 'الحفظ والمراجعة',
+    '/admin/memorization-reports': 'الحفظ والمراجعة',
+    '/admin/attendance/take': 'سجل الحضور',
+    '/admin/attendance/logs': 'سجل الحضور السابق',
+    '/admin/attendance-sheet': 'سجل الحضور',
+    '/admin/attendance-reports': 'الحضور والغياب',
     '/dashboard/attendance': 'الحضور والغياب',
     '/dashboard/evaluations': 'الاختبارات والتقييمات',
+    '/admin/exam-reports': 'الاختبارات والتقييمات',
     '/dashboard/staff-monitoring': 'مواظبة الموظفين',
+    '/admin/staff-attendance-reports': 'مواظبة الموظفين',
 
     // Admin
     '/admin/institutes': 'المعاهد',
     '/admin/employees': 'الموظفون',
+    '/admin/employee-management': 'إدارة الموظفين',
+    '/admin/payroll-management': 'الرواتب',
+    '/admin/teachers': 'إدارة المعلمين',
     '/admin/circles': 'الحلقات',
     '/admin/students': 'الطلاب',
     '/admin/parents': 'أولياء الأمور',
@@ -27,6 +38,8 @@ const LABELS: Record<string, string> = {
     // Teacher
     '/teacher/circles': 'حلقاتي',
     '/teacher/attendance': 'الحضور والغياب',
+    '/teacher/attendance/take': 'سجل الحضور',
+    '/teacher/attendance-sheet': 'سجل الحضور',
     '/teacher/assessments': 'الاختبارات',
 
     // Student

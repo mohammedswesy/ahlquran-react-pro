@@ -8,13 +8,14 @@ type Props<T> = {
     rows: T[]
     filename?: string
     enableXlsx?: boolean // مرّر true لو منصّب xlsx
+    buttonClassName?: string
 }
 
-export default function ExportMenu<T>({ rows, filename = "export", enableXlsx = true }: Props<T>) {
+export default function ExportMenu<T>({ rows, filename = "export", enableXlsx = true, buttonClassName }: Props<T>) {
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" className={buttonClassName}>
                     <Download className="mr-2 h-4 w-4" />
                     تصدير
                 </Button>

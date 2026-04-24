@@ -13,6 +13,9 @@ import {
     PiBooksBold as Library,
     PiIdentificationCardBold as IdCard,
     PiLaptopBold as Laptop,
+    PiExamBold as Exam,
+    PiFingerprintBold as Fingerprint,
+    PiCurrencyDollarBold as Subscription,
 } from "react-icons/pi"
 
 export type Role =
@@ -38,7 +41,7 @@ export function getMenuForRole(role: Role | null | undefined): MenuSection[] {
     if (isSuperAdmin) {
         return [
             {
-                items: [{ label: "لوحة القيادة", to: "/admin", icon: LayoutDashboard }],
+                items: [{ label: "لوحة القيادة التنفيذية", to: "/admin/dashboard", icon: LayoutDashboard }],
             },
             {
                 title: "الإدارة العامة",
@@ -54,6 +57,10 @@ export function getMenuForRole(role: Role | null | undefined): MenuSection[] {
                     { label: "التقارير", to: "/admin/reports", icon: FileText },
                     { label: "الإشعارات", to: "/admin/notifications", icon: Bell },
                     { label: "الموظفون", to: "/admin/employees", icon: UserCog },
+                    { label: "إدارة الموظفين", to: "/admin/employee-management", icon: UserCog },
+                    { label: "الرواتب", to: "/admin/payroll-management", icon: Subscription },
+                    { label: "سجل الاختبارات", to: "/admin/exams", icon: Exam },
+                    { label: "إدارة الاشتراكات", to: "/super-admin/subscriptions", icon: Subscription },
                 ],
             },
         ]
@@ -68,9 +75,20 @@ export function getMenuForRole(role: Role | null | undefined): MenuSection[] {
                 title: "إدارة المعهد",
                 items: [
                     { label: "المدرسين", to: "/admin/teachers", icon: UserCog },
+                    { label: "إدارة الموظفين", to: "/admin/employee-management", icon: UserCog },
+                    { label: "الرواتب", to: "/admin/payroll-management", icon: Subscription },
                     { label: "الحلقات", to: "/admin/circles", icon: BookOpen },
                     { label: "الطلاب", to: "/admin/students", icon: Users },
                     { label: "التقارير", to: "/admin/reports", icon: FileText },
+                    { label: "سجل الاختبارات", to: "/admin/exams", icon: Exam },
+                ],
+            },
+            {
+                title: "الحضور والإدارة",
+                items: [
+                    { label: "سجل الحضور", to: "/admin/attendance/take", icon: Fingerprint },
+                    { label: "تقارير الحضور", to: "/admin/attendance-reports", icon: FileText },
+                    { label: "تقارير الحفظ والمراجعة", to: "/admin/memorization-reports", icon: FileText },
                 ],
             },
             {
@@ -95,6 +113,8 @@ export function getMenuForRole(role: Role | null | undefined): MenuSection[] {
                     { label: "الحلقات", to: "/admin/circles", icon: BookOpen },
                     { label: "الطلاب", to: "/admin/students", icon: Users },
                     { label: "المدرسين", to: "/admin/teachers", icon: UserCog },
+                    { label: "إدارة الموظفين", to: "/admin/employee-management", icon: UserCog },
+                    { label: "الرواتب", to: "/admin/payroll-management", icon: Subscription },
                     { label: "التقارير", to: "/admin/reports", icon: FileText },
                 ],
             },
@@ -120,6 +140,14 @@ export function getMenuForRole(role: Role | null | undefined): MenuSection[] {
                     { label: "التقييمات", to: "/teacher/assessments", icon: FileText },
                     { label: "الحفظ", to: "/teacher/memorization", icon: BookOpen },
                     { label: "المراجعات", to: "/teacher/reviews", icon: ClipboardList },
+                    { label: "سجل الاختبارات", to: "/teacher/exams", icon: Exam },
+                ],
+            },
+            {
+                title: "الحضور",
+                items: [
+                    { label: "سجل الحضور", to: "/teacher/attendance/take", icon: Fingerprint },
+                    { label: "تقارير الحضور", to: "/teacher/attendance-reports", icon: FileText },
                 ],
             },
         ]
@@ -127,11 +155,12 @@ export function getMenuForRole(role: Role | null | undefined): MenuSection[] {
 
     if (role === "student") {
         return [
-            { items: [{ label: "لوحة القيادة", to: "/student", icon: LayoutDashboard }] },
+            { items: [{ label: "الرئيسية", to: "/student", icon: LayoutDashboard }] },
             {
+                title: "بوابة الطالب",
                 items: [
-                    { label: "تقدّمي", to: "/student/progress", icon: LineChart },
-                    { label: "جدولي", to: "/student/schedule", icon: ClipboardList },
+                    { label: "اختباراتي وشهاداتي", to: "/student/exams", icon: Exam },
+                    { label: "سجل حضوري", to: "/student/attendance", icon: Fingerprint },
                 ],
             },
         ]
